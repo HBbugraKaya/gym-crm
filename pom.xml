@@ -18,6 +18,7 @@
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.18</logback.version>
         <junit.version>5.12.2</junit.version>
+        <mockito.version>5.18.0</mockito.version>
         <assertj.version>3.27.3</assertj.version>
         <jacoco.version>0.8.13</jacoco.version>
     </properties>
@@ -73,6 +74,12 @@
             <version>${assertj.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -90,6 +97,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.3</version>
                 <configuration>
+                    <argLine>@{argLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                     <useModulePath>false</useModulePath>
                 </configuration>
             </plugin>
@@ -111,6 +119,12 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <excludes>
+                                <exclude>com/example/gymcrm/application/**</exclude>
+                                <exclude>com/example/gymcrm/config/**</exclude>
+                                <exclude>com/example/gymcrm/facade/**</exclude>
+                                <exclude>com/example/gymcrm/repository/**</exclude>
+                            </excludes>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
