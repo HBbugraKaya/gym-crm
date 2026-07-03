@@ -3,6 +3,7 @@ package com.example.gymcrm.service.impl;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingType;
+import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ProfileStateException;
@@ -85,13 +86,13 @@ public class TrainerServiceImpl implements TrainerService {
     @Transactional
     public Trainer update(Credentials credentials, UpdateTrainerCommand command) {
         requireNonNull(command, "command");
+        String firstName = requireText(command.firstName(), "firstName");
+        String lastName = requireText(command.lastName(), "lastName");
+        TrainingTypeName specializationName = requireNonNull(command.specialization(), "trainingType");
+
         Trainer trainer = authenticationService.authenticateTrainer(credentials);
-        TrainingType specialization = findTrainingType(command.specialization());
-        trainer.updateProfile(
-                requireText(command.firstName(), "firstName"),
-                requireText(command.lastName(), "lastName"),
-                specialization,
-                command.active());
+        TrainingType specialization = findTrainingType(specializationName);
+        trainer.updateProfile(firstName, lastName, specialization, command.active());
         LOGGER.info("Updated trainer id={} username={} specialization={}",
                 trainer.getId(), trainer.getUsername(), specialization.getName());
         return trainer;
@@ -100,8 +101,9 @@ public class TrainerServiceImpl implements TrainerService {
     @Override
     @Transactional
     public void changePassword(Credentials credentials, String newPassword) {
+        String password = requireText(newPassword, "newPassword");
         Trainer trainer = authenticationService.authenticateTrainer(credentials);
-        trainer.changePassword(requireText(newPassword, "newPassword"));
+        trainer.changePassword(password);
         LOGGER.info("Changed trainer password id={} username={}", trainer.getId(), trainer.getUsername());
     }
 
@@ -137,7 +139,7 @@ public class TrainerServiceImpl implements TrainerService {
         return trainerRepository.findAll();
     }
 
-    private TrainingType findTrainingType(com.example.gymcrm.domain.TrainingTypeName name) {
+    private TrainingType findTrainingType(TrainingTypeName name) {
         requireNonNull(name, "trainingType");
         return trainingTypeRepository.findByName(name)
                 .orElseThrow(() -> new EntityNotFoundException("TrainingType", name.name()));

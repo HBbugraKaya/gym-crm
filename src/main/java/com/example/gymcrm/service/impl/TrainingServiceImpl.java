@@ -4,6 +4,7 @@ import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingType;
+import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.repository.TraineeRepository;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static com.example.gymcrm.service.ValidationSupport.requireNonNull;
@@ -47,22 +49,29 @@ public class TrainingServiceImpl implements TrainingService {
     @Transactional
     public Training addTraining(Credentials trainerCredentials, AddTrainingCommand command) {
         requireNonNull(command, "command");
-        Trainer trainer = authenticationService.authenticateTrainer(trainerCredentials);
-        requireSameTrainer(trainer.getUsername(), command.trainerUsername());
+        String traineeUsername = requireText(command.traineeUsername(), "traineeUsername");
+        String trainerUsername = requireText(command.trainerUsername(), "trainerUsername");
+        String trainingName = requireText(command.trainingName(), "trainingName");
+        TrainingTypeName trainingTypeName = requireNonNull(command.trainingType(), "trainingType");
+        LocalDate trainingDate = requireNonNull(command.trainingDate(), "trainingDate");
+        int durationMinutes = requirePositive(command.durationMinutes(), "durationMinutes");
 
-        Trainee trainee = traineeRepository.findByUsername(requireText(command.traineeUsername(), "traineeUsername"))
-                .orElseThrow(() -> new EntityNotFoundException("Trainee", command.traineeUsername()));
-        TrainingType trainingType = trainingTypeRepository.findByName(requireNonNull(command.trainingType(), "trainingType"))
-                .orElseThrow(() -> new EntityNotFoundException("TrainingType", command.trainingType().name()));
+        Trainer trainer = authenticationService.authenticateTrainer(trainerCredentials);
+        requireSameTrainer(trainer.getUsername(), trainerUsername);
+
+        Trainee trainee = traineeRepository.findByUsername(traineeUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Trainee", traineeUsername));
+        TrainingType trainingType = trainingTypeRepository.findByName(trainingTypeName)
+                .orElseThrow(() -> new EntityNotFoundException("TrainingType", trainingTypeName.name()));
 
         trainee.assignTrainer(trainer);
         Training training = new Training(
                 trainee,
                 trainer,
-                requireText(command.trainingName(), "trainingName"),
+                trainingName,
                 trainingType,
-                requireNonNull(command.trainingDate(), "trainingDate"),
-                requirePositive(command.durationMinutes(), "durationMinutes"));
+                trainingDate,
+                durationMinutes);
 
         Training saved = trainingRepository.save(training);
         LOGGER.info("Added training id={} traineeUsername={} trainerUsername={} type={}",

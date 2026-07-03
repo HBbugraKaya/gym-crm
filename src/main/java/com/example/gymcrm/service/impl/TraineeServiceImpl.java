@@ -91,13 +91,12 @@ public class TraineeServiceImpl implements TraineeService {
     @Transactional
     public Trainee update(Credentials credentials, UpdateTraineeCommand command) {
         requireNonNull(command, "command");
+        String firstName = requireText(command.firstName(), "firstName");
+        String lastName = requireText(command.lastName(), "lastName");
+        String address = optionalText(command.address());
+
         Trainee trainee = authenticationService.authenticateTrainee(credentials);
-        trainee.updateProfile(
-                requireText(command.firstName(), "firstName"),
-                requireText(command.lastName(), "lastName"),
-                command.dateOfBirth(),
-                optionalText(command.address()),
-                command.active());
+        trainee.updateProfile(firstName, lastName, command.dateOfBirth(), address, command.active());
         LOGGER.info("Updated trainee id={} username={}", trainee.getId(), trainee.getUsername());
         return trainee;
     }
@@ -105,8 +104,9 @@ public class TraineeServiceImpl implements TraineeService {
     @Override
     @Transactional
     public void changePassword(Credentials credentials, String newPassword) {
+        String password = requireText(newPassword, "newPassword");
         Trainee trainee = authenticationService.authenticateTrainee(credentials);
-        trainee.changePassword(requireText(newPassword, "newPassword"));
+        trainee.changePassword(password);
         LOGGER.info("Changed trainee password id={} username={}", trainee.getId(), trainee.getUsername());
     }
 
