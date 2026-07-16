@@ -1,0 +1,14 @@
+target/
+.idea/
+.vscode/
+*.iml
+*.log
+*.class
+.DS_Store
+hs_err_pid*
+
+.excalidraw-tmp/
+architecture.excalidraw
+architecture.md
+architecture.png
+
