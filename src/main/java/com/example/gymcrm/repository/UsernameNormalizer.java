@@ -7,8 +7,12 @@ final class UsernameNormalizer {
     private UsernameNormalizer() {
     }
 
+    static String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     static String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return trim(value).toLowerCase(Locale.ROOT);
     }
 
     static String likePattern(String value) {

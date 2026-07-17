@@ -9,7 +9,7 @@ The application keeps the existing layered design and lets Spring Boot own infra
 - `web`: REST controllers, DTO mapping, error handling and transaction-ID filtering
 - `facade`: coordination boundary retained from the previous module
 - `service`: use cases and transaction boundaries; profile access uses the Spring Security context
-- `repository`: Spring Data JPA repositories (custom fragment for dynamic training queries)
+- `repository`: Spring Data JPA derived queries / `@EntityGraph`; custom fragment only for dynamic training filters
 - `security`: HTTP Basic authentication, BCrypt password hashing and `CurrentUser` helpers
 - `domain`: trainees, trainers, users, training types and trainings
 - `observability`: Actuator health indicators and low-cardinality Micrometer metrics
