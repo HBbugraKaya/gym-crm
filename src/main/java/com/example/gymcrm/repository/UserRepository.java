@@ -1,52 +1,48 @@
 package com.example.gymcrm.repository;
 
 import com.example.gymcrm.domain.User;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-import java.util.Locale;
 import java.util.Optional;
 
-@Repository
-public class UserRepository {
-    @PersistenceContext
-    private EntityManager entityManager;
+public interface UserRepository extends JpaRepository<User, Long> {
 
-    public Optional<User> findByUsername(String username) {
-        return entityManager.createQuery("""
-                        select u
-                        from User u
-                        where lower(u.username) = :username
-                        """, User.class)
-                .setParameter("username", normalize(username))
-                .getResultStream()
-                .findFirst();
+    @Query("""
+            select u
+            from User u
+            where lower(u.username) = :username
+            """)
+    Optional<User> findByNormalizedUsername(@Param("username") String username);
+
+    @Query("""
+            select count(u) > 0
+            from User u
+            where lower(u.username) = :username
+            """)
+    boolean existsByNormalizedUsername(@Param("username") String username);
+
+    @Query("""
+            select count(u)
+            from User u
+            where lower(u.firstName) = :firstName
+              and lower(u.lastName) = :lastName
+            """)
+    long countByNormalizedFirstNameAndLastName(@Param("firstName") String firstName,
+                                               @Param("lastName") String lastName);
+
+    default Optional<User> findByUsername(String username) {
+        return findByNormalizedUsername(UsernameNormalizer.normalize(username));
     }
 
-    public boolean existsByUsername(String username) {
-        return entityManager.createQuery("""
-                        select count(u)
-                        from User u
-                        where lower(u.username) = :username
-                        """, Long.class)
-                .setParameter("username", normalize(username))
-                .getSingleResult() > 0;
+    default boolean existsByUsername(String username) {
+        return existsByNormalizedUsername(UsernameNormalizer.normalize(username));
     }
 
-    public long countByFirstNameAndLastName(String firstName, String lastName) {
-        return entityManager.createQuery("""
-                        select count(u)
-                        from User u
-                        where lower(u.firstName) = :firstName
-                          and lower(u.lastName) = :lastName
-                        """, Long.class)
-                .setParameter("firstName", normalize(firstName))
-                .setParameter("lastName", normalize(lastName))
-                .getSingleResult();
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    default long countByFirstNameAndLastName(String firstName, String lastName) {
+        return countByNormalizedFirstNameAndLastName(
+                UsernameNormalizer.normalize(firstName),
+                UsernameNormalizer.normalize(lastName));
     }
 }
