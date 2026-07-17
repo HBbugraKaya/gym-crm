@@ -8,17 +8,13 @@ The application keeps the existing layered design and lets Spring Boot own infra
 
 - `web`: REST controllers, DTO mapping, error handling and transaction-ID filtering
 - `facade`: coordination boundary retained from the previous module
-- `service`: use cases, authentication and transaction boundaries
-- `repository`: JPA persistence through `EntityManager`
+- `service`: use cases and transaction boundaries; profile access uses the Spring Security context
+- `repository`: Spring Data JPA repositories (custom fragment for dynamic training queries)
+- `security`: HTTP Basic authentication, BCrypt password hashing and `CurrentUser` helpers
 - `domain`: trainees, trainers, users, training types and trainings
 - `observability`: Actuator health indicators and low-cardinality Micrometer metrics
 
-The migration deliberately does not rewrite repositories as Spring Data interfaces, introduce JWT,
-Flyway, Docker or a metrics server. Those changes are not required by this module and would expand the
-solution without improving the requested behavior.
-
-Security is provided by Spring Security with stateless HTTP Basic authentication and BCrypt password
-hashing.
+JWT, Flyway and Docker are intentionally out of scope for this module.
 
 ## Build and run
 
