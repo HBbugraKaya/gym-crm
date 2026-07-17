@@ -1,27 +1,22 @@
 package com.example.gymcrm.integration;
 
-import com.example.gymcrm.config.AppConfig;
-import com.example.gymcrm.web.config.WebConfig;
+import com.example.gymcrm.GymCrmApplication;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.test.context.web.WebAppConfiguration;
-import org.springframework.web.context.WebApplicationContext;
+import org.springframework.test.web.servlet.RequestBuilder;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
@@ -38,24 +33,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(SpringExtension.class)
-@WebAppConfiguration
-@ContextConfiguration(classes = {AppConfig.class, WebConfig.class})
-@TestPropertySource(properties = {
-        "gym.db.url=jdbc:h2:mem:gymcrm-integration;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
-        "gym.hibernate.ddl-auto=create-drop"
-})
+@SpringBootTest(classes = GymCrmApplication.class)
+@AutoConfigureMockMvc
+@ActiveProfiles("local")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class GymCrmApiIntegrationTest {
     private static final AtomicLong UNIQUE_SEQUENCE = new AtomicLong(System.nanoTime());
 
+    @Autowired
     private MockMvc mockMvc;
 
     @Autowired
-    private WebApplicationContext webApplicationContext;
-
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -64,12 +55,67 @@ class GymCrmApiIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
-    void setUpMockMvc() {
-        objectMapper = JsonMapper.builder().findAndAddModules().build();
+    void setUpJdbcTemplate() {
         jdbcTemplate = new JdbcTemplate(dataSource);
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .addFilters(new com.example.gymcrm.web.filter.TransactionIdFilter())
-                .build();
+    }
+
+    @Test
+    void actuatorExposesCustomHealthIndicatorsAndPrometheusMetrics() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.applicationProfile.status").value("UP"))
+                .andExpect(jsonPath("$.components.trainingTypeCatalog.status").value("UP"));
+
+        MvcResult metrics = mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(metrics.getResponse().getContentAsString())
+                .contains("gymcrm_profiles_total", "gymcrm_trainings_total");
+    }
+
+    @Test
+    void everyBusinessEndpointExceptProfileCreationRequiresAuthentication() throws Exception {
+        List<RequestBuilder> protectedRequests = List.of(
+                get("/api/v1/auth/login"),
+                put("/api/v1/users/Test.User/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"newPassword1\"}"),
+                patch("/api/v1/users/Test.User/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"active\":true}"),
+                get("/api/v1/trainees/Test.User"),
+                put("/api/v1/trainees/Test.User")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Test","lastName":"User","dateOfBirth":"2000-01-01",
+                                 "address":"Address","active":true}
+                                """),
+                delete("/api/v1/trainees/Test.User"),
+                get("/api/v1/trainees/Test.User/available-trainers"),
+                put("/api/v1/trainees/Test.User/trainers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"trainerUsernames\":[]}"),
+                get("/api/v1/trainees/Test.User/trainings"),
+                get("/api/v1/trainers/Test.User"),
+                put("/api/v1/trainers/Test.User")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Test\",\"lastName\":\"User\",\"active\":true}"),
+                get("/api/v1/trainers/Test.User/trainings"),
+                post("/api/v1/trainings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"traineeUsername":"Trainee.User","trainerUsername":"Trainer.User",
+                                 "trainingName":"Test training","trainingDate":"2026-07-17","durationMinutes":45}
+                                """),
+                get("/api/v1/training-types"));
+
+        for (RequestBuilder request : protectedRequests) {
+            mockMvc.perform(request)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
+                            "Basic realm=\"gym-crm\", charset=\"UTF-8\""));
+        }
     }
 
     @Test
@@ -223,11 +269,14 @@ class GymCrmApiIntegrationTest {
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.transactionId").isNotEmpty());
 
-        mockMvc.perform(get("/api/v1/does-not-exist"))
+        RegistrationResponse trainee = registerTrainee("NotFound", "Probe");
+        mockMvc.perform(get("/api/v1/does-not-exist")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
 
-        mockMvc.perform(post("/api/v1/auth/login"))
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.status").value(405));
 

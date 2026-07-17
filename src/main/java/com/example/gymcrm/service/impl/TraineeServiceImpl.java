@@ -9,17 +9,19 @@ import com.example.gymcrm.exception.ProfileStateException;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.PasswordGenerator;
 import com.example.gymcrm.generator.UsernameGenerator;
+import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
-import com.example.gymcrm.service.AuthenticationService;
+import com.example.gymcrm.security.CurrentUser;
+import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.service.TraineeService;
-import com.example.gymcrm.service.command.Credentials;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,41 +42,48 @@ public class TraineeServiceImpl implements TraineeService {
     private final TrainingRepository trainingRepository;
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
-    private final AuthenticationService authenticationService;
+    private final PasswordEncoder passwordEncoder;
+    private final CurrentUser currentUser;
+    private final GymCrmMetrics metrics;
 
     public TraineeServiceImpl(TraineeRepository traineeRepository,
                               TrainerRepository trainerRepository,
                               TrainingRepository trainingRepository,
                               UsernameGenerator usernameGenerator,
                               PasswordGenerator passwordGenerator,
-                              AuthenticationService authenticationService) {
+                              PasswordEncoder passwordEncoder,
+                              CurrentUser currentUser,
+                              GymCrmMetrics metrics) {
         this.traineeRepository = traineeRepository;
         this.trainerRepository = trainerRepository;
         this.trainingRepository = trainingRepository;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
-        this.authenticationService = authenticationService;
+        this.passwordEncoder = passwordEncoder;
+        this.currentUser = currentUser;
+        this.metrics = metrics;
     }
 
     @Override
     @Transactional
-    public Trainee create(CreateTraineeCommand command) {
+    public CreatedAccount<Trainee> create(CreateTraineeCommand command) {
         String username = usernameGenerator.generate(command.firstName(), command.lastName());
-        String password = passwordGenerator.generate();
+        String rawPassword = passwordGenerator.generate();
 
         Trainee trainee = new Trainee(
-                new User(command.firstName(), command.lastName(), username, password, command.active()),
+                new User(command.firstName(), command.lastName(), username, passwordEncoder.encode(rawPassword), command.active()),
                 command.dateOfBirth(),
                 command.address());
         Trainee saved = traineeRepository.save(trainee);
+        metrics.recordTraineeRegistration();
         LOGGER.info("Created trainee id={} username={}", saved.getId(), saved.getUsername());
-        return saved;
+        return new CreatedAccount<>(saved, rawPassword);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Trainee findByUsername(Credentials credentials, String username) {
-        Trainee authenticated = authenticationService.authenticateTrainee(credentials);
+    public Trainee findByUsername(String username) {
+        Trainee authenticated = currentUser.requireTrainee();
         requireSameUser(authenticated.getUsername(), username, "trainee");
         authenticated.getTrainers().size();
         LOGGER.debug("Selected trainee profile username={}", authenticated.getUsername());
@@ -83,8 +92,8 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     @Transactional
-    public Trainee update(Credentials credentials, String username, UpdateTraineeCommand command) {
-        Trainee trainee = authenticationService.authenticateTrainee(credentials);
+    public Trainee update(String username, UpdateTraineeCommand command) {
+        Trainee trainee = currentUser.requireTrainee();
         requireSameUser(trainee.getUsername(), username, "trainee");
         trainee.updateProfile(
                 command.firstName(), command.lastName(), command.dateOfBirth(), command.address(), command.active());
@@ -95,32 +104,32 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     @Transactional
-    public void changePassword(Credentials credentials, String newPassword) {
-        Trainee trainee = authenticationService.authenticateTrainee(credentials);
-        trainee.changePassword(newPassword);
+    public void changePassword(String newPassword) {
+        Trainee trainee = currentUser.requireTrainee();
+        trainee.changePassword(passwordEncoder.encode(newPassword));
         LOGGER.info("Changed trainee password id={} username={}", trainee.getId(), trainee.getUsername());
     }
 
     @Override
     @Transactional
-    public Trainee activate(Credentials credentials) {
-        Trainee trainee = authenticationService.authenticateTrainee(credentials);
+    public Trainee activate() {
+        Trainee trainee = currentUser.requireTrainee();
         changeStatus(trainee, true);
         return trainee;
     }
 
     @Override
     @Transactional
-    public Trainee deactivate(Credentials credentials) {
-        Trainee trainee = authenticationService.authenticateTrainee(credentials);
+    public Trainee deactivate() {
+        Trainee trainee = currentUser.requireTrainee();
         changeStatus(trainee, false);
         return trainee;
     }
 
     @Override
     @Transactional
-    public void deleteByUsername(Credentials credentials, String username) {
-        Trainee trainee = authenticationService.authenticateTrainee(credentials);
+    public void deleteByUsername(String username) {
+        Trainee trainee = currentUser.requireTrainee();
         requireSameUser(trainee.getUsername(), username, "trainee");
         trainee.clearTrainers();
         traineeRepository.delete(trainee);
@@ -129,8 +138,8 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Training> getTrainings(Credentials credentials, String traineeUsername, TraineeTrainingCriteria criteria) {
-        Trainee trainee = authenticationService.authenticateTrainee(credentials);
+    public List<Training> getTrainings(String traineeUsername, TraineeTrainingCriteria criteria) {
+        Trainee trainee = currentUser.requireTrainee();
         requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
         List<Training> trainings = trainingRepository.findByTraineeUsername(traineeUsername, criteria);
         LOGGER.debug("Loaded trainee trainings username={} count={}", traineeUsername, trainings.size());
@@ -139,9 +148,8 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Trainer> getUnassignedTrainers(Credentials credentials, String traineeUsername) {
-        Trainee trainee = traineeRepository.findByUsernameWithTrainers(
-                        authenticationService.authenticateTrainee(credentials).getUsername())
+    public List<Trainer> getUnassignedTrainers(String traineeUsername) {
+        Trainee trainee = traineeRepository.findByUsernameWithTrainers(currentUser.requireTrainee().getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee", traineeUsername));
         requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
         Set<Long> assignedTrainerIds = trainee.getTrainers().stream()
@@ -157,9 +165,8 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     @Transactional
-    public List<Trainer> updateTrainers(Credentials credentials, String traineeUsername, Collection<String> trainerUsernames) {
-        Trainee trainee = traineeRepository.findByUsernameWithTrainers(
-                        authenticationService.authenticateTrainee(credentials).getUsername())
+    public List<Trainer> updateTrainers(String traineeUsername, Collection<String> trainerUsernames) {
+        Trainee trainee = traineeRepository.findByUsernameWithTrainers(currentUser.requireTrainee().getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee", traineeUsername));
         requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
 
@@ -173,12 +180,6 @@ public class TraineeServiceImpl implements TraineeService {
         LOGGER.info("Updated trainee trainers traineeId={} username={} trainerCount={}",
                 trainee.getId(), trainee.getUsername(), trainers.size());
         return List.copyOf(trainers);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Trainee> findAll() {
-        return traineeRepository.findAll();
     }
 
     private void changeStatus(Trainee trainee, boolean active) {

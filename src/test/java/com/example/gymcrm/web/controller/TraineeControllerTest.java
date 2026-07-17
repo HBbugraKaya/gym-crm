@@ -4,10 +4,9 @@ import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
-import com.example.gymcrm.exception.AuthenticationException;
 import com.example.gymcrm.facade.GymFacade;
+import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
-import com.example.gymcrm.service.command.Credentials;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
@@ -18,7 +17,6 @@ import com.example.gymcrm.web.dto.TrainerAssignmentsRequest;
 import com.example.gymcrm.web.dto.TrainerSummaryResponse;
 import com.example.gymcrm.web.dto.UpdateTraineeRequest;
 import com.example.gymcrm.web.mapper.GymWebMapper;
-import com.example.gymcrm.web.security.RequestCredentialsResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,24 +28,18 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TraineeControllerTest {
     private static final String USERNAME = "john.smith";
-    private static final String AUTHORIZATION = "Basic encoded";
-    private static final Credentials CREDENTIALS = new Credentials(USERNAME, "secret");
 
     @Mock
     private GymFacade gymFacade;
     @Mock
     private GymWebMapper mapper;
-    @Mock
-    private RequestCredentialsResolver credentialsResolver;
     @InjectMocks
     private TraineeController controller;
 
@@ -57,32 +49,31 @@ class TraineeControllerTest {
         var request = new TraineeRegistrationRequest("John", "Smith", birthDate, "Istanbul");
         var command = new CreateTraineeCommand("John", "Smith", birthDate, "Istanbul", true);
         Trainee trainee = mock(Trainee.class);
+        var created = new CreatedAccount<>(trainee, "generated-password");
         var expected = new RegistrationResponse(USERNAME, "generated-password");
-        when(gymFacade.createTrainee(command)).thenReturn(trainee);
-        when(mapper.toRegistrationResponse(trainee)).thenReturn(expected);
+        when(gymFacade.createTrainee(command)).thenReturn(created);
+        when(mapper.toRegistrationResponse(created)).thenReturn(expected);
 
         var response = controller.register(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isSameAs(expected);
         verify(gymFacade).createTrainee(command);
-        verify(mapper).toRegistrationResponse(trainee);
+        verify(mapper).toRegistrationResponse(created);
     }
 
     @Test
-    void getProfileResolvesCredentialsAndMapsEntity() {
+    void getProfileMapsEntity() {
         Trainee trainee = mock(Trainee.class);
         var expected = new TraineeProfileResponse(
                 USERNAME, "John", "Smith", null, null, true, List.of());
-        authenticate();
-        when(gymFacade.getTraineeProfile(CREDENTIALS, USERNAME)).thenReturn(trainee);
+        when(gymFacade.getTraineeProfile(USERNAME)).thenReturn(trainee);
         when(mapper.toTraineeProfile(trainee)).thenReturn(expected);
 
-        var result = controller.getProfile(USERNAME, AUTHORIZATION);
+        var result = controller.getProfile(USERNAME);
 
         assertThat(result).isSameAs(expected);
-        verify(credentialsResolver).resolve(AUTHORIZATION);
-        verify(gymFacade).getTraineeProfile(CREDENTIALS, USERNAME);
+        verify(gymFacade).getTraineeProfile(USERNAME);
     }
 
     @Test
@@ -93,24 +84,21 @@ class TraineeControllerTest {
         Trainee updated = mock(Trainee.class);
         var expected = new TraineeProfileResponse(
                 USERNAME, "Johnny", "Smith", birthDate, "Ankara", false, List.of());
-        authenticate();
-        when(gymFacade.updateTrainee(CREDENTIALS, USERNAME, command)).thenReturn(updated);
+        when(gymFacade.updateTrainee(USERNAME, command)).thenReturn(updated);
         when(mapper.toTraineeProfile(updated)).thenReturn(expected);
 
-        var result = controller.updateProfile(USERNAME, AUTHORIZATION, request);
+        var result = controller.updateProfile(USERNAME, request);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).updateTrainee(CREDENTIALS, USERNAME, command);
+        verify(gymFacade).updateTrainee(USERNAME, command);
     }
 
     @Test
     void deleteProfileDelegatesHardDeleteAndReturnsOk() {
-        authenticate();
-
-        var response = controller.deleteProfile(USERNAME, AUTHORIZATION);
+        var response = controller.deleteProfile(USERNAME);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(gymFacade).deleteTrainee(CREDENTIALS, USERNAME);
+        verify(gymFacade).deleteTrainee(USERNAME);
     }
 
     @Test
@@ -118,14 +106,13 @@ class TraineeControllerTest {
         List<Trainer> trainers = List.of(mock(Trainer.class));
         List<TrainerSummaryResponse> expected = List.of(
                 new TrainerSummaryResponse("alice.coach", "Alice", "Coach", TrainingTypeName.YOGA));
-        authenticate();
-        when(gymFacade.getUnassignedTrainers(CREDENTIALS, USERNAME)).thenReturn(trainers);
+        when(gymFacade.getUnassignedTrainers(USERNAME)).thenReturn(trainers);
         when(mapper.toTrainerSummaries(trainers)).thenReturn(expected);
 
-        var result = controller.getAvailableTrainers(USERNAME, AUTHORIZATION);
+        var result = controller.getAvailableTrainers(USERNAME);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getUnassignedTrainers(CREDENTIALS, USERNAME);
+        verify(gymFacade).getUnassignedTrainers(USERNAME);
         verify(mapper).toTrainerSummaries(trainers);
     }
 
@@ -134,15 +121,13 @@ class TraineeControllerTest {
         var request = new TrainerAssignmentsRequest(List.of("alice.coach", "bob.coach"));
         List<Trainer> trainers = List.of(mock(Trainer.class));
         List<TrainerSummaryResponse> expected = List.of();
-        authenticate();
-        when(gymFacade.updateTraineeTrainers(CREDENTIALS, USERNAME, request.trainerUsernames()))
-                .thenReturn(trainers);
+        when(gymFacade.updateTraineeTrainers(USERNAME, request.trainerUsernames())).thenReturn(trainers);
         when(mapper.toTrainerSummaries(trainers)).thenReturn(expected);
 
-        var result = controller.updateTrainers(USERNAME, AUTHORIZATION, request);
+        var result = controller.updateTrainers(USERNAME, request);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).updateTraineeTrainers(CREDENTIALS, USERNAME, request.trainerUsernames());
+        verify(gymFacade).updateTraineeTrainers(USERNAME, request.trainerUsernames());
         verify(mapper).toTrainerSummaries(trainers);
     }
 
@@ -153,28 +138,13 @@ class TraineeControllerTest {
         var criteria = new TraineeTrainingCriteria(from, to, "Alice", TrainingTypeName.YOGA);
         List<Training> trainings = List.of(mock(Training.class));
         List<TraineeTrainingResponse> expected = List.of();
-        authenticate();
-        when(gymFacade.getTraineeTrainings(CREDENTIALS, USERNAME, criteria)).thenReturn(trainings);
+        when(gymFacade.getTraineeTrainings(USERNAME, criteria)).thenReturn(trainings);
         when(mapper.toTraineeTrainings(trainings)).thenReturn(expected);
 
-        var result = controller.getTrainings(
-                USERNAME, AUTHORIZATION, from, to, "Alice", TrainingTypeName.YOGA);
+        var result = controller.getTrainings(USERNAME, from, to, "Alice", TrainingTypeName.YOGA);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getTraineeTrainings(CREDENTIALS, USERNAME, criteria);
+        verify(gymFacade).getTraineeTrainings(USERNAME, criteria);
         verify(mapper).toTraineeTrainings(trainings);
-    }
-
-    @Test
-    void protectedEndpointStopsWhenAuthorizationCannotBeResolved() {
-        when(credentialsResolver.resolve(AUTHORIZATION)).thenThrow(new AuthenticationException("Basic"));
-
-        assertThatThrownBy(() -> controller.getProfile(USERNAME, AUTHORIZATION))
-                .isInstanceOf(AuthenticationException.class);
-        verifyNoInteractions(gymFacade, mapper);
-    }
-
-    private void authenticate() {
-        when(credentialsResolver.resolve(AUTHORIZATION)).thenReturn(CREDENTIALS);
     }
 }

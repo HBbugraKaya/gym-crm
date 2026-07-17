@@ -1,85 +1,111 @@
-# Spring REST Gym CRM
+# Spring Boot Gym CRM
 
-Java 21 and Spring MVC REST API for managing trainees, trainers, assignments, training sessions, and the constant training-type catalog. The application uses Spring Core, Spring MVC, and Hibernate without Spring Boot.
+Java 21 and Spring Boot REST API for managing trainees, trainers, assignments and training sessions.
 
-## Requirements
+## Architecture
 
-- JDK 21 or newer
-- A Servlet 6 compatible container such as Tomcat 10.1
-- No external database is required for local use; the default profile uses in-memory H2.
+The application keeps the existing layered design and lets Spring Boot own infrastructure bootstrap:
+
+- `web`: REST controllers, DTO mapping, error handling and transaction-ID filtering
+- `facade`: coordination boundary retained from the previous module
+- `service`: use cases, authentication and transaction boundaries
+- `repository`: JPA persistence through `EntityManager`
+- `domain`: trainees, trainers, users, training types and trainings
+- `observability`: Actuator health indicators and low-cardinality Micrometer metrics
+
+The migration deliberately does not rewrite repositories as Spring Data interfaces, introduce JWT,
+Flyway, Docker or a metrics server. Those changes are not required by this module and would expand the
+solution without improving the requested behavior.
+
+Security is provided by Spring Security with stateless HTTP Basic authentication and BCrypt password
+hashing.
 
 ## Build and run
 
+Requirements:
+
+- JDK 21 or newer
+
+Run all tests and the coverage gate:
+
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
 ./mvnw.cmd clean verify
 ```
 
-Deploy `target/spring-rest-gym-crm-1.0.0-SNAPSHOT.war` to the servlet container. The context path is normally the WAR file name unless the container is configured otherwise. `WebAppInitializer` registers the `DispatcherServlet` and transaction-ID filter programmatically.
+Run with the default `local` profile:
 
-## Project structure
+```powershell
+./mvnw.cmd spring-boot:run
+```
 
-- `config`: root Spring context, persistence, transactions, and training-type initialization
-- `domain`, `repository`, `service`: the application core inherited from the Hibernate module
-- `facade`: the existing coordination boundary kept for compatibility with the previous module
-- `web/config`: servlet-container entry point and Spring MVC configuration
-- `web/controller`, `web/dto`, `web/mapper`: REST transport layer
-- `web/error`, `web/filter`, `web/security`: cross-cutting HTTP concerns
+Or build and run the executable jar:
 
-There is intentionally no `application` package or `main` method. This is a classic Spring MVC WAR, so the servlet container starts the application through `WebAppInitializer`.
+```powershell
+./mvnw.cmd clean package
+java -jar target/spring-boot-gym-crm-1.0.0-SNAPSHOT.jar
+```
 
-Controller methods are documented with Swagger 2 `io.swagger.annotations` annotations as required by the task. The project intentionally does not add a Swagger UI or runtime document generator because the task only requires method annotations.
+Select another environment with `--spring.profiles.active=dev`, `stg` or `prod`.
+
+## Environment profiles
+
+Each profile has independent database properties:
+
+| Profile | Database | Schema strategy | Intended use |
+|---|---|---|---|
+| `local` | in-memory H2 `gymcrm-local` | `create-drop` | local development and tests |
+| `dev` | file H2 `gymcrm-dev` | `update` | persistent developer data |
+| `stg` | PostgreSQL from `GYMCRM_STG_DB_*` | `validate` | staging |
+| `prod` | PostgreSQL from `GYMCRM_PROD_DB_*` | `validate` | production |
+
+Staging variables:
+
+- `GYMCRM_STG_DB_URL`
+- `GYMCRM_STG_DB_USERNAME`
+- `GYMCRM_STG_DB_PASSWORD`
+
+Production uses the equivalent `GYMCRM_PROD_DB_URL`, `GYMCRM_PROD_DB_USERNAME` and
+`GYMCRM_PROD_DB_PASSWORD` variables. No staging or production credentials are stored in the repository.
 
 ## Authentication
 
-Trainee and trainer registration are public. Every other business endpoint uses HTTP Basic authentication. Registration returns the generated username and password exactly once. Authorization headers and password-bearing payloads are never logged.
+Trainee and trainer registration (`POST /api/v1/trainees`, `POST /api/v1/trainers`) are public. Every
+other `/api/**` endpoint requires HTTP Basic credentials validated by Spring Security. Passwords are
+stored with BCrypt; registration still returns the one-time plaintext password in the response body.
+Profile-specific operations verify that the authenticated username matches the requested profile.
+Inactive users can still authenticate because `UserDetails.isEnabled()` is always true.
 
-Each request accepts an optional canonical UUID in `X-Transaction-Id`. Missing or invalid IDs are replaced, propagated through MDC for service logs, and returned in the response header and error body.
+Actuator endpoints (`/actuator/**`) are public operational endpoints and do not require gym credentials.
+Unauthorized API requests return JSON `ApiError` responses with `WWW-Authenticate: Basic realm="gym-crm"`.
 
-## REST API
+## Actuator and Prometheus
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `POST` | `/api/v1/trainees` | Register a trainee |
-| `POST` | `/api/v1/trainers` | Register a trainer |
-| `GET` | `/api/v1/auth/login` | Validate Basic credentials |
-| `PUT` | `/api/v1/users/{username}/password` | Change a user's password |
-| `PATCH` | `/api/v1/users/{username}/status` | Activate or deactivate the underlying user |
-| `GET` | `/api/v1/trainees/{username}` | Get a trainee profile and trainers |
-| `PUT` | `/api/v1/trainees/{username}` | Replace editable trainee profile fields |
-| `DELETE` | `/api/v1/trainees/{username}` | Hard-delete a trainee and cascade trainings |
-| `GET` | `/api/v1/trainees/{username}/available-trainers` | List active, unassigned trainers |
-| `PUT` | `/api/v1/trainees/{username}/trainers` | Replace trainer assignments |
-| `GET` | `/api/v1/trainees/{username}/trainings` | Filter trainee trainings |
-| `GET` | `/api/v1/trainers/{username}` | Get a trainer profile and trainees |
-| `PUT` | `/api/v1/trainers/{username}` | Replace editable trainer fields; specialization remains read-only |
-| `GET` | `/api/v1/trainers/{username}/trainings` | Filter trainer trainings |
-| `POST` | `/api/v1/trainings` | Add a training using the trainer's specialization |
-| `GET` | `/api/v1/training-types` | List the immutable training-type catalog |
+The application exposes only the required operational endpoints:
 
-Profile and assignment `PUT` operations use replacement semantics. Registration and training creation are non-idempotent. Repeating a status `PATCH` with the current state returns `409 Conflict`, as required by the task.
+- `/actuator/health`
+- `/actuator/info`
+- `/actuator/prometheus`
 
-## Error handling and logging
+Custom health components verify that exactly one environment profile is active and that the required training-type
+catalog is ready. Extra non-environment profiles are allowed. Local and dev show health details; stg and prod return
+only aggregate status.
 
-Errors use a consistent JSON record containing timestamp, HTTP status, message, request path, transaction ID, and field violations. The global handler maps validation, authentication, missing resources, state conflicts, unsupported methods/media types, and unexpected failures to precise HTTP statuses.
+Custom business metrics:
 
-Logging uses `DEBUG`, `INFO`, `WARN`, and `ERROR` levels. Request logs contain only the method, path without query parameters, status, duration, and transaction ID. Passwords, authorization values, request bodies, addresses, and dates of birth are excluded.
+- `gymcrm.profiles.created`, tagged only with `type=trainee|trainer`
+- `gymcrm.trainings.created`
 
-## Tests and coverage
+Prometheus exports these counters as `gymcrm_profiles_total` and `gymcrm_trainings_total`. Counters are incremented
+only after the related database transaction commits.
 
-```powershell
-./mvnw.cmd clean verify
-```
+## Logging
 
-The suite combines fast Mockito unit tests, Bean Validation contract tests, filter/error tests, controller and mapper tests, plus Spring MVC/H2/MockMvc integration flows. JaCoCo checks the complete production codebase with no package exclusions and fails the build below 80% line coverage.
+Every request receives or reuses a canonical `X-Transaction-Id`, which is propagated through MDC and returned in
+the response. Logs include method, path, status and duration. Authorization values, passwords, bodies, addresses
+and dates of birth are never logged. Application logging is `DEBUG` in local/dev and `INFO` in stg/prod.
 
-## Database configuration
+## Tests
 
-Defaults can be overridden with JVM system properties supplied to the servlet container:
-
-```powershell
-$env:CATALINA_OPTS = "-Dgym.db.url=jdbc:postgresql://localhost:5432/gymcrm -Dgym.db.username=gym -Dgym.db.password=secret -Dgym.db.driver=org.postgresql.Driver -Dgym.hibernate.ddl-auto=validate"
-```
-
-Add the matching JDBC driver dependency when switching from H2 to another database.
+The suite combines unit tests, controller tests and a Spring Boot/H2/MockMvc integration flow. It verifies the
+application bootstrap, automatic filter registration, authentication behavior, custom health indicators,
+Prometheus metrics and profile-specific database properties. JaCoCo fails the build below 80% line coverage.

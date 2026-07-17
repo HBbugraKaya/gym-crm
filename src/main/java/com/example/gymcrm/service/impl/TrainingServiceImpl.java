@@ -7,19 +7,17 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
+import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
-import com.example.gymcrm.service.AuthenticationService;
+import com.example.gymcrm.security.CurrentUser;
 import com.example.gymcrm.service.TrainingService;
 import com.example.gymcrm.service.command.AddTrainingCommand;
-import com.example.gymcrm.service.command.Credentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class TrainingServiceImpl implements TrainingService {
@@ -28,22 +26,25 @@ public class TrainingServiceImpl implements TrainingService {
     private final TrainingRepository trainingRepository;
     private final TraineeRepository traineeRepository;
     private final TrainingTypeRepository trainingTypeRepository;
-    private final AuthenticationService authenticationService;
+    private final CurrentUser currentUser;
+    private final GymCrmMetrics metrics;
 
     public TrainingServiceImpl(TrainingRepository trainingRepository,
                                TraineeRepository traineeRepository,
                                TrainingTypeRepository trainingTypeRepository,
-                               AuthenticationService authenticationService) {
+                               CurrentUser currentUser,
+                               GymCrmMetrics metrics) {
         this.trainingRepository = trainingRepository;
         this.traineeRepository = traineeRepository;
         this.trainingTypeRepository = trainingTypeRepository;
-        this.authenticationService = authenticationService;
+        this.currentUser = currentUser;
+        this.metrics = metrics;
     }
 
     @Override
     @Transactional
-    public Training addTraining(Credentials trainerCredentials, AddTrainingCommand command) {
-        Trainer trainer = authenticationService.authenticateTrainer(trainerCredentials);
+    public Training addTraining(AddTrainingCommand command) {
+        Trainer trainer = currentUser.requireTrainer();
         requireSameTrainer(trainer.getUsername(), command.trainerUsername());
 
         Trainee trainee = traineeRepository.findByUsername(command.traineeUsername())
@@ -60,15 +61,10 @@ public class TrainingServiceImpl implements TrainingService {
                 command.durationMinutes());
 
         Training saved = trainingRepository.save(training);
+        metrics.recordTrainingCreated();
         LOGGER.info("Added training id={} traineeUsername={} trainerUsername={} type={}",
                 saved.getId(), trainee.getUsername(), trainer.getUsername(), trainingType.getName());
         return saved;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Training> findAll() {
-        return trainingRepository.findAll();
     }
 
     private void requireSameTrainer(String authenticatedUsername, String trainerUsername) {

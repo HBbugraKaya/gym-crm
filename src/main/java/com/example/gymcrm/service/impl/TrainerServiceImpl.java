@@ -10,17 +10,19 @@ import com.example.gymcrm.exception.ProfileStateException;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.PasswordGenerator;
 import com.example.gymcrm.generator.UsernameGenerator;
+import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
-import com.example.gymcrm.service.AuthenticationService;
+import com.example.gymcrm.security.CurrentUser;
+import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.service.TrainerService;
-import com.example.gymcrm.service.command.Credentials;
 import com.example.gymcrm.service.command.CreateTrainerCommand;
 import com.example.gymcrm.service.command.UpdateTrainerCommand;
 import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,42 +37,49 @@ public class TrainerServiceImpl implements TrainerService {
     private final TrainingRepository trainingRepository;
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
-    private final AuthenticationService authenticationService;
+    private final PasswordEncoder passwordEncoder;
+    private final CurrentUser currentUser;
+    private final GymCrmMetrics metrics;
 
     public TrainerServiceImpl(TrainerRepository trainerRepository,
                               TrainingTypeRepository trainingTypeRepository,
                               TrainingRepository trainingRepository,
                               UsernameGenerator usernameGenerator,
                               PasswordGenerator passwordGenerator,
-                              AuthenticationService authenticationService) {
+                              PasswordEncoder passwordEncoder,
+                              CurrentUser currentUser,
+                              GymCrmMetrics metrics) {
         this.trainerRepository = trainerRepository;
         this.trainingTypeRepository = trainingTypeRepository;
         this.trainingRepository = trainingRepository;
         this.usernameGenerator = usernameGenerator;
         this.passwordGenerator = passwordGenerator;
-        this.authenticationService = authenticationService;
+        this.passwordEncoder = passwordEncoder;
+        this.currentUser = currentUser;
+        this.metrics = metrics;
     }
 
     @Override
     @Transactional
-    public Trainer create(CreateTrainerCommand command) {
+    public CreatedAccount<Trainer> create(CreateTrainerCommand command) {
         TrainingType specialization = findTrainingType(command.specialization());
         String username = usernameGenerator.generate(command.firstName(), command.lastName());
-        String password = passwordGenerator.generate();
+        String rawPassword = passwordGenerator.generate();
 
         Trainer trainer = new Trainer(
-                new User(command.firstName(), command.lastName(), username, password, command.active()),
+                new User(command.firstName(), command.lastName(), username, passwordEncoder.encode(rawPassword), command.active()),
                 specialization);
         Trainer saved = trainerRepository.save(trainer);
+        metrics.recordTrainerRegistration();
         LOGGER.info("Created trainer id={} username={} specialization={}",
                 saved.getId(), saved.getUsername(), specialization.getName());
-        return saved;
+        return new CreatedAccount<>(saved, rawPassword);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Trainer findByUsername(Credentials credentials, String username) {
-        Trainer authenticated = authenticationService.authenticateTrainer(credentials);
+    public Trainer findByUsername(String username) {
+        Trainer authenticated = currentUser.requireTrainer();
         requireSameUser(authenticated.getUsername(), username, "trainer");
         authenticated.getTrainees().size();
         LOGGER.debug("Selected trainer profile username={}", authenticated.getUsername());
@@ -79,8 +88,8 @@ public class TrainerServiceImpl implements TrainerService {
 
     @Override
     @Transactional
-    public Trainer update(Credentials credentials, String username, UpdateTrainerCommand command) {
-        Trainer trainer = authenticationService.authenticateTrainer(credentials);
+    public Trainer update(String username, UpdateTrainerCommand command) {
+        Trainer trainer = currentUser.requireTrainer();
         requireSameUser(trainer.getUsername(), username, "trainer");
         trainer.updateProfile(command.firstName(), command.lastName(), command.active());
         trainer.getTrainees().size();
@@ -91,42 +100,36 @@ public class TrainerServiceImpl implements TrainerService {
 
     @Override
     @Transactional
-    public void changePassword(Credentials credentials, String newPassword) {
-        Trainer trainer = authenticationService.authenticateTrainer(credentials);
-        trainer.changePassword(newPassword);
+    public void changePassword(String newPassword) {
+        Trainer trainer = currentUser.requireTrainer();
+        trainer.changePassword(passwordEncoder.encode(newPassword));
         LOGGER.info("Changed trainer password id={} username={}", trainer.getId(), trainer.getUsername());
     }
 
     @Override
     @Transactional
-    public Trainer activate(Credentials credentials) {
-        Trainer trainer = authenticationService.authenticateTrainer(credentials);
+    public Trainer activate() {
+        Trainer trainer = currentUser.requireTrainer();
         changeStatus(trainer, true);
         return trainer;
     }
 
     @Override
     @Transactional
-    public Trainer deactivate(Credentials credentials) {
-        Trainer trainer = authenticationService.authenticateTrainer(credentials);
+    public Trainer deactivate() {
+        Trainer trainer = currentUser.requireTrainer();
         changeStatus(trainer, false);
         return trainer;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Training> getTrainings(Credentials credentials, String trainerUsername, TrainerTrainingCriteria criteria) {
-        Trainer trainer = authenticationService.authenticateTrainer(credentials);
+    public List<Training> getTrainings(String trainerUsername, TrainerTrainingCriteria criteria) {
+        Trainer trainer = currentUser.requireTrainer();
         requireSameUser(trainer.getUsername(), trainerUsername, "trainer");
         List<Training> trainings = trainingRepository.findByTrainerUsername(trainerUsername, criteria);
         LOGGER.debug("Loaded trainer trainings username={} count={}", trainerUsername, trainings.size());
         return trainings;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Trainer> findAll() {
-        return trainerRepository.findAll();
     }
 
     private TrainingType findTrainingType(TrainingTypeName name) {

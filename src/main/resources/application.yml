@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: spring-boot-gym-crm
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+
+info:
+  application:
+    name: ${spring.application.name}
+    description: Gym trainee, trainer and training management API
+
+logging:
+  level:
+    com.example.gymcrm: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: OFF

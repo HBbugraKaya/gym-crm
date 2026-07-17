@@ -6,6 +6,7 @@ import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
+import com.example.gymcrm.service.CreatedAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,26 +27,26 @@ class GymWebMapperTest {
         mapper = new GymWebMapper();
         yoga = new TrainingType(TrainingTypeName.YOGA);
         trainee = new Trainee(
-                new User("John", "Smith", "john.smith", "trainee-password", true),
+                new User("John", "Smith", "john.smith", "encoded-trainee-password", true),
                 LocalDate.of(2001, 1, 1),
                 "Istanbul");
         trainer = new Trainer(
-                new User("Alice", "Coach", "alice.coach", "trainer-password", true),
+                new User("Alice", "Coach", "alice.coach", "encoded-trainer-password", true),
                 yoga);
         trainee.assignTrainer(trainer);
     }
 
     @Test
-    void mapsTraineeRegistrationCredentials() {
-        var response = mapper.toRegistrationResponse(trainee);
+    void mapsTraineeRegistrationCredentialsFromCreatedAccount() {
+        var response = mapper.toRegistrationResponse(new CreatedAccount<>(trainee, "trainee-password"));
 
         assertThat(response.username()).isEqualTo("john.smith");
         assertThat(response.password()).isEqualTo("trainee-password");
     }
 
     @Test
-    void mapsTrainerRegistrationCredentials() {
-        var response = mapper.toRegistrationResponse(trainer);
+    void mapsTrainerRegistrationCredentialsFromCreatedAccount() {
+        var response = mapper.toRegistrationResponse(new CreatedAccount<>(trainer, "trainer-password"));
 
         assertThat(response.username()).isEqualTo("alice.coach");
         assertThat(response.password()).isEqualTo("trainer-password");

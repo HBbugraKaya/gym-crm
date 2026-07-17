@@ -1,14 +1,14 @@
 package com.example.gymcrm.service.impl;
 
 import com.example.gymcrm.domain.User;
-import com.example.gymcrm.exception.AuthenticationException;
 import com.example.gymcrm.exception.ProfileStateException;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.repository.UserRepository;
+import com.example.gymcrm.security.CurrentUser;
 import com.example.gymcrm.service.UserAccountService;
-import com.example.gymcrm.service.command.Credentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,40 +17,35 @@ public class UserAccountServiceImpl implements UserAccountService {
     private static final Logger LOGGER = LoggerFactory.getLogger(UserAccountServiceImpl.class);
 
     private final UserRepository userRepository;
+    private final CurrentUser currentUser;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserAccountServiceImpl(UserRepository userRepository) {
+    public UserAccountServiceImpl(UserRepository userRepository,
+                                  CurrentUser currentUser,
+                                  PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User authenticate(Credentials credentials) {
-        return userRepository.findByUsername(credentials.username())
-                .filter(user -> user.getPassword().equals(credentials.password()))
-                .map(user -> {
-                    LOGGER.debug("User authenticated username={}", user.getUsername());
-                    return user;
-                })
-                .orElseThrow(() -> {
-                    LOGGER.warn("User authentication failed username={}", credentials.username());
-                    return new AuthenticationException("User");
-                });
+        this.currentUser = currentUser;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
-    public void changePassword(Credentials credentials, String targetUsername, String newPassword) {
-        User user = authenticate(credentials);
-        requireOwnAccount(user, targetUsername);
-        user.changePassword(newPassword);
+    public void changePassword(String targetUsername, String newPassword) {
+        String authenticatedUsername = currentUser.requireAuthenticatedUsername();
+        requireOwnAccount(authenticatedUsername, targetUsername);
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new ValidationException("Authenticated user can only modify own account"));
+        user.changePassword(passwordEncoder.encode(newPassword));
         LOGGER.info("Changed user password id={} username={}", user.getId(), user.getUsername());
     }
 
     @Override
     @Transactional
-    public User changeStatus(Credentials credentials, String targetUsername, boolean active) {
-        User user = authenticate(credentials);
-        requireOwnAccount(user, targetUsername);
+    public User changeStatus(String targetUsername, boolean active) {
+        String authenticatedUsername = currentUser.requireAuthenticatedUsername();
+        requireOwnAccount(authenticatedUsername, targetUsername);
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new ValidationException("Authenticated user can only modify own account"));
         if (user.isActive() == active) {
             LOGGER.warn("User status change rejected id={} username={} active={}",
                     user.getId(), user.getUsername(), active);
@@ -62,8 +57,8 @@ public class UserAccountServiceImpl implements UserAccountService {
         return user;
     }
 
-    private void requireOwnAccount(User authenticatedUser, String targetUsername) {
-        if (!authenticatedUser.getUsername().equalsIgnoreCase(targetUsername)) {
+    private void requireOwnAccount(String authenticatedUsername, String targetUsername) {
+        if (!authenticatedUsername.equalsIgnoreCase(targetUsername)) {
             throw new ValidationException("Authenticated user can only modify own account");
         }
     }

@@ -3,7 +3,6 @@ package com.example.gymcrm.service;
 import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
-import com.example.gymcrm.service.command.Credentials;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
@@ -12,25 +11,23 @@ import java.util.Collection;
 import java.util.List;
 
 public interface TraineeService {
-    Trainee create(CreateTraineeCommand command);
+    CreatedAccount<Trainee> create(CreateTraineeCommand command);
 
-    Trainee findByUsername(Credentials credentials, String username);
+    Trainee findByUsername(String username);
 
-    Trainee update(Credentials credentials, String username, UpdateTraineeCommand command);
+    Trainee update(String username, UpdateTraineeCommand command);
 
-    void changePassword(Credentials credentials, String newPassword);
+    void changePassword(String newPassword);
 
-    Trainee activate(Credentials credentials);
+    Trainee activate();
 
-    Trainee deactivate(Credentials credentials);
+    Trainee deactivate();
 
-    void deleteByUsername(Credentials credentials, String username);
+    void deleteByUsername(String username);
 
-    List<Training> getTrainings(Credentials credentials, String traineeUsername, TraineeTrainingCriteria criteria);
+    List<Training> getTrainings(String traineeUsername, TraineeTrainingCriteria criteria);
 
-    List<Trainer> getUnassignedTrainers(Credentials credentials, String traineeUsername);
+    List<Trainer> getUnassignedTrainers(String traineeUsername);
 
-    List<Trainer> updateTrainers(Credentials credentials, String traineeUsername, Collection<String> trainerUsernames);
-
-    List<Trainee> findAll();
+    List<Trainer> updateTrainers(String traineeUsername, Collection<String> trainerUsernames);
 }

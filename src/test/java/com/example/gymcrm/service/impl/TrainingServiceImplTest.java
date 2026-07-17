@@ -8,12 +8,12 @@ import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
+import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
-import com.example.gymcrm.service.AuthenticationService;
+import com.example.gymcrm.security.CurrentUser;
 import com.example.gymcrm.service.command.AddTrainingCommand;
-import com.example.gymcrm.service.command.Credentials;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +22,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +43,10 @@ class TrainingServiceImplTest {
     private TrainingTypeRepository trainingTypeRepository;
 
     @Mock
-    private AuthenticationService authenticationService;
+    private CurrentUser currentUser;
+
+    @Mock
+    private GymCrmMetrics metrics;
 
     @InjectMocks
     private TrainingServiceImpl service;
@@ -54,16 +56,15 @@ class TrainingServiceImplTest {
         Trainer trainer = trainer("Coach.One");
         Trainee trainee = trainee("Runner.One");
         TrainingType yoga = new TrainingType(TrainingTypeName.YOGA);
-        Credentials credentials = new Credentials("Coach.One", "secret1234");
         AddTrainingCommand command = new AddTrainingCommand(
                 "Runner.One", "Coach.One", "Evening yoga", TrainingTypeName.YOGA,
                 LocalDate.of(2026, 7, 2), 45);
-        when(authenticationService.authenticateTrainer(credentials)).thenReturn(trainer);
+        when(currentUser.requireTrainer()).thenReturn(trainer);
         when(traineeRepository.findByUsername("Runner.One")).thenReturn(Optional.of(trainee));
         when(trainingTypeRepository.findByName(TrainingTypeName.YOGA)).thenReturn(Optional.of(yoga));
         when(trainingRepository.save(any(Training.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Training saved = service.addTraining(credentials, command);
+        Training saved = service.addTraining(command);
 
         ArgumentCaptor<Training> captor = ArgumentCaptor.forClass(Training.class);
         verify(trainingRepository).save(captor.capture());
@@ -76,21 +77,21 @@ class TrainingServiceImplTest {
         assertThat(saved.getDurationMinutes()).isEqualTo(45);
         assertThat(trainee.getTrainers()).containsExactly(trainer);
         assertThat(trainer.getTrainees()).containsExactly(trainee);
+        verify(metrics).recordTrainingCreated();
     }
 
     @Test
     void addTrainingCanDeriveTrainingTypeFromTrainerSpecialization() {
         Trainer trainer = trainer("Coach.One");
         Trainee trainee = trainee("Runner.One");
-        Credentials credentials = new Credentials("Coach.One", "secret1234");
         AddTrainingCommand command = new AddTrainingCommand(
                 "Runner.One", "Coach.One", "Morning yoga",
                 LocalDate.of(2026, 7, 3), 30);
-        when(authenticationService.authenticateTrainer(credentials)).thenReturn(trainer);
+        when(currentUser.requireTrainer()).thenReturn(trainer);
         when(traineeRepository.findByUsername("Runner.One")).thenReturn(Optional.of(trainee));
         when(trainingRepository.save(any(Training.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Training saved = service.addTraining(credentials, command);
+        Training saved = service.addTraining(command);
 
         assertThat(saved.getTrainingType()).isSameAs(trainer.getSpecialization());
         verify(trainingTypeRepository, never()).findByName(any());
@@ -99,10 +100,9 @@ class TrainingServiceImplTest {
     @Test
     void addTrainingRejectsTrainerUsernameMismatchBeforeRepositoryLookup() {
         Trainer trainer = trainer("Coach.One");
-        Credentials credentials = new Credentials("Coach.One", "secret1234");
-        when(authenticationService.authenticateTrainer(credentials)).thenReturn(trainer);
+        when(currentUser.requireTrainer()).thenReturn(trainer);
 
-        assertThatThrownBy(() -> service.addTraining(credentials, new AddTrainingCommand(
+        assertThatThrownBy(() -> service.addTraining(new AddTrainingCommand(
                 "Runner.One", "Other.Coach", "Yoga", TrainingTypeName.YOGA,
                 LocalDate.of(2026, 7, 2), 45)))
                 .isInstanceOf(ValidationException.class);
@@ -113,11 +113,10 @@ class TrainingServiceImplTest {
     @Test
     void addTrainingRejectsMissingTraineeOrTrainingType() {
         Trainer trainer = trainer("Coach.One");
-        Credentials credentials = new Credentials("Coach.One", "secret1234");
-        when(authenticationService.authenticateTrainer(credentials)).thenReturn(trainer);
+        when(currentUser.requireTrainer()).thenReturn(trainer);
         when(traineeRepository.findByUsername("Missing.Runner")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.addTraining(credentials, new AddTrainingCommand(
+        assertThatThrownBy(() -> service.addTraining(new AddTrainingCommand(
                 "Missing.Runner", "Coach.One", "Yoga", TrainingTypeName.YOGA,
                 LocalDate.of(2026, 7, 2), 45)))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -126,19 +125,10 @@ class TrainingServiceImplTest {
         when(traineeRepository.findByUsername("Runner.One")).thenReturn(Optional.of(trainee));
         when(trainingTypeRepository.findByName(TrainingTypeName.YOGA)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.addTraining(credentials, new AddTrainingCommand(
+        assertThatThrownBy(() -> service.addTraining(new AddTrainingCommand(
                 "Runner.One", "Coach.One", "Yoga", TrainingTypeName.YOGA,
                 LocalDate.of(2026, 7, 2), 45)))
                 .isInstanceOf(EntityNotFoundException.class);
-    }
-
-    @Test
-    void findAllDelegatesToRepository() {
-        Training training = new Training(trainee("Runner.One"), trainer("Coach.One"), "Yoga",
-                new TrainingType(TrainingTypeName.YOGA), LocalDate.of(2026, 7, 2), 45);
-        when(trainingRepository.findAll()).thenReturn(List.of(training));
-
-        assertThat(service.findAll()).containsExactly(training);
     }
 
     private Trainee trainee(String username) {

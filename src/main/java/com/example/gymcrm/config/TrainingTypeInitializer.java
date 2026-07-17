@@ -5,18 +5,17 @@ import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.repository.TrainingTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
-public class TrainingTypeInitializer implements ApplicationListener<ContextRefreshedEvent> {
+@Component
+public class TrainingTypeInitializer implements ApplicationRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrainingTypeInitializer.class);
 
     private final TrainingTypeRepository trainingTypeRepository;
     private final TransactionTemplate transactionTemplate;
-    private final AtomicBoolean initialized = new AtomicBoolean(false);
 
     public TrainingTypeInitializer(TrainingTypeRepository trainingTypeRepository,
                                    TransactionTemplate transactionTemplate) {
@@ -25,11 +24,7 @@ public class TrainingTypeInitializer implements ApplicationListener<ContextRefre
     }
 
     @Override
-    public void onApplicationEvent(ContextRefreshedEvent event) {
-        if (!initialized.compareAndSet(false, true)) {
-            return;
-        }
-
+    public void run(ApplicationArguments args) {
         transactionTemplate.executeWithoutResult(status -> {
             for (TrainingTypeName name : TrainingTypeName.values()) {
                 if (!trainingTypeRepository.existsByName(name)) {

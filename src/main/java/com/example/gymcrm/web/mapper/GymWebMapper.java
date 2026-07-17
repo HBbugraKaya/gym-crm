@@ -4,6 +4,7 @@ import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingType;
+import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TraineeProfileResponse;
 import com.example.gymcrm.web.dto.TraineeSummaryResponse;
@@ -19,12 +20,13 @@ import java.util.List;
 @Component
 public class GymWebMapper {
 
-    public RegistrationResponse toRegistrationResponse(Trainee trainee) {
-        return new RegistrationResponse(trainee.getUsername(), trainee.getPassword());
-    }
-
-    public RegistrationResponse toRegistrationResponse(Trainer trainer) {
-        return new RegistrationResponse(trainer.getUsername(), trainer.getPassword());
+    public RegistrationResponse toRegistrationResponse(CreatedAccount<?> created) {
+        String username = switch (created.profile()) {
+            case Trainee trainee -> trainee.getUsername();
+            case Trainer trainer -> trainer.getUsername();
+            default -> throw new IllegalArgumentException("Unsupported profile type");
+        };
+        return new RegistrationResponse(username, created.rawPassword());
     }
 
     public TraineeProfileResponse toTraineeProfile(Trainee trainee) {

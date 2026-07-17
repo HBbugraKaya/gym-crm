@@ -7,6 +7,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -15,6 +18,8 @@ import java.util.UUID;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public final class TransactionIdFilter extends OncePerRequestFilter {
 
     public static final String TRANSACTION_ID_HEADER = "X-Transaction-Id";

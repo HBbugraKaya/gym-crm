@@ -1,10 +1,7 @@
 package com.example.gymcrm.web.controller;
 
-import com.example.gymcrm.domain.Trainee;
-import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.facade.GymFacade;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
-import com.example.gymcrm.service.command.Credentials;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
@@ -15,14 +12,13 @@ import com.example.gymcrm.web.dto.TrainerAssignmentsRequest;
 import com.example.gymcrm.web.dto.TrainerSummaryResponse;
 import com.example.gymcrm.web.dto.UpdateTraineeRequest;
 import com.example.gymcrm.web.mapper.GymWebMapper;
-import com.example.gymcrm.web.security.RequestCredentialsResolver;
+import com.example.gymcrm.domain.TrainingTypeName;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,7 +27,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,14 +40,10 @@ import java.util.List;
 public class TraineeController {
     private final GymFacade gymFacade;
     private final GymWebMapper mapper;
-    private final RequestCredentialsResolver credentialsResolver;
 
-    public TraineeController(GymFacade gymFacade,
-                             GymWebMapper mapper,
-                             RequestCredentialsResolver credentialsResolver) {
+    public TraineeController(GymFacade gymFacade, GymWebMapper mapper) {
         this.gymFacade = gymFacade;
         this.mapper = mapper;
-        this.credentialsResolver = credentialsResolver;
     }
 
     @PostMapping
@@ -64,9 +55,9 @@ public class TraineeController {
             @ApiResponse(code = 400, message = "Request validation failed")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TraineeRegistrationRequest request) {
-        Trainee trainee = gymFacade.createTrainee(new CreateTraineeCommand(
+        var created = gymFacade.createTrainee(new CreateTraineeCommand(
                 request.firstName(), request.lastName(), request.dateOfBirth(), request.address(), true));
-        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toRegistrationResponse(trainee));
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toRegistrationResponse(created));
     }
 
     @GetMapping("/{username}")
@@ -76,10 +67,8 @@ public class TraineeController {
             @ApiResponse(code = 400, message = "Authenticated trainee differs from the requested username"),
             @ApiResponse(code = 401, message = "Trainee credentials are invalid")
     })
-    public TraineeProfileResponse getProfile(
-            @PathVariable String username,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        return mapper.toTraineeProfile(gymFacade.getTraineeProfile(credentials(authorization), username));
+    public TraineeProfileResponse getProfile(@PathVariable String username) {
+        return mapper.toTraineeProfile(gymFacade.getTraineeProfile(username));
     }
 
     @PutMapping("/{username}")
@@ -93,10 +82,8 @@ public class TraineeController {
     })
     public TraineeProfileResponse updateProfile(
             @PathVariable String username,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @Valid @RequestBody UpdateTraineeRequest request) {
-        Credentials credentials = credentials(authorization);
-        Trainee trainee = gymFacade.updateTrainee(credentials, username, new UpdateTraineeCommand(
+        var trainee = gymFacade.updateTrainee(username, new UpdateTraineeCommand(
                 request.firstName(), request.lastName(), request.dateOfBirth(), request.address(), request.active()));
         return mapper.toTraineeProfile(trainee);
     }
@@ -109,10 +96,8 @@ public class TraineeController {
             @ApiResponse(code = 400, message = "Authenticated trainee differs from the requested username"),
             @ApiResponse(code = 401, message = "Trainee credentials are invalid")
     })
-    public ResponseEntity<Void> deleteProfile(
-            @PathVariable String username,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        gymFacade.deleteTrainee(credentials(authorization), username);
+    public ResponseEntity<Void> deleteProfile(@PathVariable String username) {
+        gymFacade.deleteTrainee(username);
         return ResponseEntity.ok().build();
     }
 
@@ -126,11 +111,8 @@ public class TraineeController {
             @ApiResponse(code = 401, message = "Trainee credentials are invalid"),
             @ApiResponse(code = 404, message = "Trainee was not found")
     })
-    public List<TrainerSummaryResponse> getAvailableTrainers(
-            @PathVariable String username,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        return mapper.toTrainerSummaries(
-                gymFacade.getUnassignedTrainers(credentials(authorization), username));
+    public List<TrainerSummaryResponse> getAvailableTrainers(@PathVariable String username) {
+        return mapper.toTrainerSummaries(gymFacade.getUnassignedTrainers(username));
     }
 
     @PutMapping("/{username}/trainers")
@@ -146,10 +128,9 @@ public class TraineeController {
     })
     public List<TrainerSummaryResponse> updateTrainers(
             @PathVariable String username,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @Valid @RequestBody TrainerAssignmentsRequest request) {
-        return mapper.toTrainerSummaries(gymFacade.updateTraineeTrainers(
-                credentials(authorization), username, request.trainerUsernames()));
+        return mapper.toTrainerSummaries(
+                gymFacade.updateTraineeTrainers(username, request.trainerUsernames()));
     }
 
     @GetMapping("/{username}/trainings")
@@ -164,17 +145,11 @@ public class TraineeController {
     })
     public List<TraineeTrainingResponse> getTrainings(
             @PathVariable String username,
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
             @RequestParam(required = false) String trainerName,
             @RequestParam(required = false) TrainingTypeName trainingType) {
         var criteria = new TraineeTrainingCriteria(periodFrom, periodTo, trainerName, trainingType);
-        return mapper.toTraineeTrainings(
-                gymFacade.getTraineeTrainings(credentials(authorization), username, criteria));
-    }
-
-    private Credentials credentials(String authorization) {
-        return credentialsResolver.resolve(authorization);
+        return mapper.toTraineeTrainings(gymFacade.getTraineeTrainings(username, criteria));
     }
 }
