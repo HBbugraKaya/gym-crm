@@ -1,6 +1,6 @@
 package com.example.gymcrm.web.controller;
 
-import com.example.gymcrm.facade.GymFacade;
+import com.example.gymcrm.service.TrainingService;
 import com.example.gymcrm.service.command.AddTrainingCommand;
 import com.example.gymcrm.web.dto.AddTrainingRequest;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class TrainingControllerTest {
     @Mock
-    private GymFacade gymFacade;
+    private TrainingService trainingService;
     @InjectMocks
     private TrainingController controller;
 
@@ -31,7 +31,7 @@ class TrainingControllerTest {
         var response = controller.addTraining(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(gymFacade).addTraining(new AddTrainingCommand(
+        verify(trainingService).addTraining(new AddTrainingCommand(
                 "john.smith", "alice.coach", "Morning yoga", date, 60));
     }
 }

@@ -149,16 +149,9 @@ public class TraineeServiceImpl implements TraineeService {
     @Override
     @Transactional(readOnly = true)
     public List<Trainer> getUnassignedTrainers(String traineeUsername) {
-        Trainee trainee = traineeRepository.findByUsernameWithTrainers(currentUser.requireTrainee().getUsername())
-                .orElseThrow(() -> new EntityNotFoundException("Trainee", traineeUsername));
+        Trainee trainee = currentUser.requireTrainee();
         requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
-        Set<Long> assignedTrainerIds = trainee.getTrainers().stream()
-                .map(Trainer::getId)
-                .collect(Collectors.toSet());
-        List<Trainer> unassigned = trainerRepository.findAll().stream()
-                .filter(Trainer::isActive)
-                .filter(trainer -> !assignedTrainerIds.contains(trainer.getId()))
-                .toList();
+        List<Trainer> unassigned = trainerRepository.findUnassignedActiveTrainers(traineeUsername);
         LOGGER.debug("Loaded unassigned trainers for trainee username={} count={}", traineeUsername, unassigned.size());
         return unassigned;
     }

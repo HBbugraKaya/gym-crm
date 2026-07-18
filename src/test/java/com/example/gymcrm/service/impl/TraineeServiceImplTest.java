@@ -165,18 +165,11 @@ class TraineeServiceImplTest {
     }
 
     @Test
-    void getUnassignedTrainersFiltersAssignedAndInactiveTrainers() {
+    void getUnassignedTrainersDelegatesToRepository() {
         Trainee trainee = trainee("Runner.One", true);
-        Trainer assigned = trainer("Assigned.Trainer", 21L);
         Trainer unassigned = trainer("Free.Trainer", 22L);
-        Trainer inactive = new Trainer(
-                new User("Inactive", "Trainer", "Inactive.Trainer", "secret1234", false),
-                new TrainingType(TrainingTypeName.YOGA));
-        setId(inactive, 23L);
-        trainee.assignTrainer(assigned);
         when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(traineeRepository.findByUsernameWithTrainers("Runner.One")).thenReturn(Optional.of(trainee));
-        when(trainerRepository.findAll()).thenReturn(List.of(assigned, unassigned, inactive));
+        when(trainerRepository.findUnassignedActiveTrainers("Runner.One")).thenReturn(List.of(unassigned));
 
         assertThat(service.getUnassignedTrainers("Runner.One")).containsExactly(unassigned);
     }

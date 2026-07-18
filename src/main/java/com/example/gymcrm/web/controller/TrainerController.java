@@ -1,6 +1,6 @@
 package com.example.gymcrm.web.controller;
 
-import com.example.gymcrm.facade.GymFacade;
+import com.example.gymcrm.service.TrainerService;
 import com.example.gymcrm.service.command.CreateTrainerCommand;
 import com.example.gymcrm.service.command.UpdateTrainerCommand;
 import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
@@ -34,11 +34,11 @@ import java.util.List;
 @RequestMapping("/api/v1/trainers")
 @Api(tags = "Trainers")
 public class TrainerController {
-    private final GymFacade gymFacade;
+    private final TrainerService trainerService;
     private final GymWebMapper mapper;
 
-    public TrainerController(GymFacade gymFacade, GymWebMapper mapper) {
-        this.gymFacade = gymFacade;
+    public TrainerController(TrainerService trainerService, GymWebMapper mapper) {
+        this.trainerService = trainerService;
         this.mapper = mapper;
     }
 
@@ -52,7 +52,7 @@ public class TrainerController {
             @ApiResponse(code = 404, message = "Specialization was not found")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TrainerRegistrationRequest request) {
-        var created = gymFacade.createTrainer(new CreateTrainerCommand(
+        var created = trainerService.create(new CreateTrainerCommand(
                 request.firstName(), request.lastName(), request.specialization(), true));
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toRegistrationResponse(created));
     }
@@ -65,7 +65,7 @@ public class TrainerController {
             @ApiResponse(code = 401, message = "Trainer credentials are invalid")
     })
     public TrainerProfileResponse getProfile(@PathVariable String username) {
-        return mapper.toTrainerProfile(gymFacade.getTrainerProfile(username));
+        return mapper.toTrainerProfile(trainerService.findByUsername(username));
     }
 
     @PutMapping("/{username}")
@@ -80,7 +80,7 @@ public class TrainerController {
     public TrainerProfileResponse updateProfile(
             @PathVariable String username,
             @Valid @RequestBody UpdateTrainerRequest request) {
-        var updated = gymFacade.updateTrainer(username, new UpdateTrainerCommand(
+        var updated = trainerService.update(username, new UpdateTrainerCommand(
                 request.firstName(),
                 request.lastName(),
                 request.active()));
@@ -103,6 +103,6 @@ public class TrainerController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
             @RequestParam(required = false) String traineeName) {
         var criteria = new TrainerTrainingCriteria(periodFrom, periodTo, traineeName);
-        return mapper.toTrainerTrainings(gymFacade.getTrainerTrainings(username, criteria));
+        return mapper.toTrainerTrainings(trainerService.getTrainings(username, criteria));
     }
 }

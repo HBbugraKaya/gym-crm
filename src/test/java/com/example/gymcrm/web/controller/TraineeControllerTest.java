@@ -4,7 +4,7 @@ import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
-import com.example.gymcrm.facade.GymFacade;
+import com.example.gymcrm.service.TraineeService;
 import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
@@ -37,7 +37,7 @@ class TraineeControllerTest {
     private static final String USERNAME = "john.smith";
 
     @Mock
-    private GymFacade gymFacade;
+    private TraineeService traineeService;
     @Mock
     private GymWebMapper mapper;
     @InjectMocks
@@ -51,14 +51,14 @@ class TraineeControllerTest {
         Trainee trainee = mock(Trainee.class);
         var created = new CreatedAccount<>(trainee, "generated-password");
         var expected = new RegistrationResponse(USERNAME, "generated-password");
-        when(gymFacade.createTrainee(command)).thenReturn(created);
+        when(traineeService.create(command)).thenReturn(created);
         when(mapper.toRegistrationResponse(created)).thenReturn(expected);
 
         var response = controller.register(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isSameAs(expected);
-        verify(gymFacade).createTrainee(command);
+        verify(traineeService).create(command);
         verify(mapper).toRegistrationResponse(created);
     }
 
@@ -67,13 +67,13 @@ class TraineeControllerTest {
         Trainee trainee = mock(Trainee.class);
         var expected = new TraineeProfileResponse(
                 USERNAME, "John", "Smith", null, null, true, List.of());
-        when(gymFacade.getTraineeProfile(USERNAME)).thenReturn(trainee);
+        when(traineeService.findByUsername(USERNAME)).thenReturn(trainee);
         when(mapper.toTraineeProfile(trainee)).thenReturn(expected);
 
         var result = controller.getProfile(USERNAME);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getTraineeProfile(USERNAME);
+        verify(traineeService).findByUsername(USERNAME);
     }
 
     @Test
@@ -84,13 +84,13 @@ class TraineeControllerTest {
         Trainee updated = mock(Trainee.class);
         var expected = new TraineeProfileResponse(
                 USERNAME, "Johnny", "Smith", birthDate, "Ankara", false, List.of());
-        when(gymFacade.updateTrainee(USERNAME, command)).thenReturn(updated);
+        when(traineeService.update(USERNAME, command)).thenReturn(updated);
         when(mapper.toTraineeProfile(updated)).thenReturn(expected);
 
         var result = controller.updateProfile(USERNAME, request);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).updateTrainee(USERNAME, command);
+        verify(traineeService).update(USERNAME, command);
     }
 
     @Test
@@ -98,7 +98,7 @@ class TraineeControllerTest {
         var response = controller.deleteProfile(USERNAME);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(gymFacade).deleteTrainee(USERNAME);
+        verify(traineeService).deleteByUsername(USERNAME);
     }
 
     @Test
@@ -106,13 +106,13 @@ class TraineeControllerTest {
         List<Trainer> trainers = List.of(mock(Trainer.class));
         List<TrainerSummaryResponse> expected = List.of(
                 new TrainerSummaryResponse("alice.coach", "Alice", "Coach", TrainingTypeName.YOGA));
-        when(gymFacade.getUnassignedTrainers(USERNAME)).thenReturn(trainers);
+        when(traineeService.getUnassignedTrainers(USERNAME)).thenReturn(trainers);
         when(mapper.toTrainerSummaries(trainers)).thenReturn(expected);
 
         var result = controller.getAvailableTrainers(USERNAME);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getUnassignedTrainers(USERNAME);
+        verify(traineeService).getUnassignedTrainers(USERNAME);
         verify(mapper).toTrainerSummaries(trainers);
     }
 
@@ -121,13 +121,13 @@ class TraineeControllerTest {
         var request = new TrainerAssignmentsRequest(List.of("alice.coach", "bob.coach"));
         List<Trainer> trainers = List.of(mock(Trainer.class));
         List<TrainerSummaryResponse> expected = List.of();
-        when(gymFacade.updateTraineeTrainers(USERNAME, request.trainerUsernames())).thenReturn(trainers);
+        when(traineeService.updateTrainers(USERNAME, request.trainerUsernames())).thenReturn(trainers);
         when(mapper.toTrainerSummaries(trainers)).thenReturn(expected);
 
         var result = controller.updateTrainers(USERNAME, request);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).updateTraineeTrainers(USERNAME, request.trainerUsernames());
+        verify(traineeService).updateTrainers(USERNAME, request.trainerUsernames());
         verify(mapper).toTrainerSummaries(trainers);
     }
 
@@ -138,13 +138,13 @@ class TraineeControllerTest {
         var criteria = new TraineeTrainingCriteria(from, to, "Alice", TrainingTypeName.YOGA);
         List<Training> trainings = List.of(mock(Training.class));
         List<TraineeTrainingResponse> expected = List.of();
-        when(gymFacade.getTraineeTrainings(USERNAME, criteria)).thenReturn(trainings);
+        when(traineeService.getTrainings(USERNAME, criteria)).thenReturn(trainings);
         when(mapper.toTraineeTrainings(trainings)).thenReturn(expected);
 
         var result = controller.getTrainings(USERNAME, from, to, "Alice", TrainingTypeName.YOGA);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getTraineeTrainings(USERNAME, criteria);
+        verify(traineeService).getTrainings(USERNAME, criteria);
         verify(mapper).toTraineeTrainings(trainings);
     }
 }

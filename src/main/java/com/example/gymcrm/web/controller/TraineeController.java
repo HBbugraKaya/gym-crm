@@ -1,6 +1,6 @@
 package com.example.gymcrm.web.controller;
 
-import com.example.gymcrm.facade.GymFacade;
+import com.example.gymcrm.service.TraineeService;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
@@ -38,11 +38,11 @@ import java.util.List;
 @RequestMapping("/api/v1/trainees")
 @Api(tags = "Trainees")
 public class TraineeController {
-    private final GymFacade gymFacade;
+    private final TraineeService traineeService;
     private final GymWebMapper mapper;
 
-    public TraineeController(GymFacade gymFacade, GymWebMapper mapper) {
-        this.gymFacade = gymFacade;
+    public TraineeController(TraineeService traineeService, GymWebMapper mapper) {
+        this.traineeService = traineeService;
         this.mapper = mapper;
     }
 
@@ -55,7 +55,7 @@ public class TraineeController {
             @ApiResponse(code = 400, message = "Request validation failed")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TraineeRegistrationRequest request) {
-        var created = gymFacade.createTrainee(new CreateTraineeCommand(
+        var created = traineeService.create(new CreateTraineeCommand(
                 request.firstName(), request.lastName(), request.dateOfBirth(), request.address(), true));
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toRegistrationResponse(created));
     }
@@ -68,7 +68,7 @@ public class TraineeController {
             @ApiResponse(code = 401, message = "Trainee credentials are invalid")
     })
     public TraineeProfileResponse getProfile(@PathVariable String username) {
-        return mapper.toTraineeProfile(gymFacade.getTraineeProfile(username));
+        return mapper.toTraineeProfile(traineeService.findByUsername(username));
     }
 
     @PutMapping("/{username}")
@@ -83,7 +83,7 @@ public class TraineeController {
     public TraineeProfileResponse updateProfile(
             @PathVariable String username,
             @Valid @RequestBody UpdateTraineeRequest request) {
-        var trainee = gymFacade.updateTrainee(username, new UpdateTraineeCommand(
+        var trainee = traineeService.update(username, new UpdateTraineeCommand(
                 request.firstName(), request.lastName(), request.dateOfBirth(), request.address(), request.active()));
         return mapper.toTraineeProfile(trainee);
     }
@@ -97,7 +97,7 @@ public class TraineeController {
             @ApiResponse(code = 401, message = "Trainee credentials are invalid")
     })
     public ResponseEntity<Void> deleteProfile(@PathVariable String username) {
-        gymFacade.deleteTrainee(username);
+        traineeService.deleteByUsername(username);
         return ResponseEntity.ok().build();
     }
 
@@ -112,7 +112,7 @@ public class TraineeController {
             @ApiResponse(code = 404, message = "Trainee was not found")
     })
     public List<TrainerSummaryResponse> getAvailableTrainers(@PathVariable String username) {
-        return mapper.toTrainerSummaries(gymFacade.getUnassignedTrainers(username));
+        return mapper.toTrainerSummaries(traineeService.getUnassignedTrainers(username));
     }
 
     @PutMapping("/{username}/trainers")
@@ -130,7 +130,7 @@ public class TraineeController {
             @PathVariable String username,
             @Valid @RequestBody TrainerAssignmentsRequest request) {
         return mapper.toTrainerSummaries(
-                gymFacade.updateTraineeTrainers(username, request.trainerUsernames()));
+                traineeService.updateTrainers(username, request.trainerUsernames()));
     }
 
     @GetMapping("/{username}/trainings")
@@ -150,6 +150,6 @@ public class TraineeController {
             @RequestParam(required = false) String trainerName,
             @RequestParam(required = false) TrainingTypeName trainingType) {
         var criteria = new TraineeTrainingCriteria(periodFrom, periodTo, trainerName, trainingType);
-        return mapper.toTraineeTrainings(gymFacade.getTraineeTrainings(username, criteria));
+        return mapper.toTraineeTrainings(traineeService.getTrainings(username, criteria));
     }
 }

@@ -3,7 +3,7 @@ package com.example.gymcrm.web.controller;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
-import com.example.gymcrm.facade.GymFacade;
+import com.example.gymcrm.service.TrainerService;
 import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.service.command.CreateTrainerCommand;
 import com.example.gymcrm.service.command.UpdateTrainerCommand;
@@ -34,7 +34,7 @@ class TrainerControllerTest {
     private static final String USERNAME = "alice.coach";
 
     @Mock
-    private GymFacade gymFacade;
+    private TrainerService trainerService;
     @Mock
     private GymWebMapper mapper;
     @InjectMocks
@@ -47,14 +47,14 @@ class TrainerControllerTest {
         Trainer trainer = mock(Trainer.class);
         var created = new CreatedAccount<>(trainer, "generated-password");
         var expected = new RegistrationResponse(USERNAME, "generated-password");
-        when(gymFacade.createTrainer(command)).thenReturn(created);
+        when(trainerService.create(command)).thenReturn(created);
         when(mapper.toRegistrationResponse(created)).thenReturn(expected);
 
         var response = controller.register(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isSameAs(expected);
-        verify(gymFacade).createTrainer(command);
+        verify(trainerService).create(command);
         verify(mapper).toRegistrationResponse(created);
     }
 
@@ -63,13 +63,13 @@ class TrainerControllerTest {
         Trainer trainer = mock(Trainer.class);
         var expected = new TrainerProfileResponse(
                 USERNAME, "Alice", "Coach", TrainingTypeName.YOGA, true, List.of());
-        when(gymFacade.getTrainerProfile(USERNAME)).thenReturn(trainer);
+        when(trainerService.findByUsername(USERNAME)).thenReturn(trainer);
         when(mapper.toTrainerProfile(trainer)).thenReturn(expected);
 
         var result = controller.getProfile(USERNAME);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getTrainerProfile(USERNAME);
+        verify(trainerService).findByUsername(USERNAME);
     }
 
     @Test
@@ -79,13 +79,13 @@ class TrainerControllerTest {
         var command = new UpdateTrainerCommand("Alicia", "Coach", false);
         var expected = new TrainerProfileResponse(
                 USERNAME, "Alicia", "Coach", TrainingTypeName.YOGA, false, List.of());
-        when(gymFacade.updateTrainer(USERNAME, command)).thenReturn(updated);
+        when(trainerService.update(USERNAME, command)).thenReturn(updated);
         when(mapper.toTrainerProfile(updated)).thenReturn(expected);
 
         var result = controller.updateProfile(USERNAME, request);
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).updateTrainer(USERNAME, command);
+        verify(trainerService).update(USERNAME, command);
     }
 
     @Test
@@ -95,13 +95,13 @@ class TrainerControllerTest {
         var criteria = new TrainerTrainingCriteria(from, to, "John");
         List<Training> trainings = List.of(mock(Training.class));
         List<TrainerTrainingResponse> expected = List.of();
-        when(gymFacade.getTrainerTrainings(USERNAME, criteria)).thenReturn(trainings);
+        when(trainerService.getTrainings(USERNAME, criteria)).thenReturn(trainings);
         when(mapper.toTrainerTrainings(trainings)).thenReturn(expected);
 
         var result = controller.getTrainings(USERNAME, from, to, "John");
 
         assertThat(result).isSameAs(expected);
-        verify(gymFacade).getTrainerTrainings(USERNAME, criteria);
+        verify(trainerService).getTrainings(USERNAME, criteria);
         verify(mapper).toTrainerTrainings(trainings);
     }
 }
