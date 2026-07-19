@@ -15,8 +15,6 @@ import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
 import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.command.CreateTrainerCommand;
-import com.example.gymcrm.service.command.UpdateTrainerCommand;
 import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,7 +72,7 @@ class TrainerServiceTest {
         when(passwordEncoder.encode("secret1234")).thenReturn("encoded-secret1234");
         when(trainerRepository.save(any(Trainer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var created = service.create(new CreateTrainerCommand("Alice", "Coach", TrainingTypeName.YOGA, true));
+        var created = service.create("Alice", "Coach", TrainingTypeName.YOGA);
 
         assertThat(created.rawPassword()).isEqualTo("secret1234");
         assertThat(created.profile().getFirstName()).isEqualTo("Alice");
@@ -90,8 +88,7 @@ class TrainerServiceTest {
     void createRejectsUnknownSpecializationBeforeSaving() {
         when(trainingTypeRepository.findByName(TrainingTypeName.CARDIO)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(new CreateTrainerCommand(
-                "Bob", "Trainer", TrainingTypeName.CARDIO, true)))
+        assertThatThrownBy(() -> service.create("Bob", "Trainer", TrainingTypeName.CARDIO))
                 .isInstanceOf(EntityNotFoundException.class);
         verify(trainerRepository, never()).save(any());
     }
@@ -114,7 +111,7 @@ class TrainerServiceTest {
         when(currentUser.requireTrainer()).thenReturn(trainer);
         when(trainerRepository.findByUsernameWithTrainees("Bob.Trainer")).thenReturn(Optional.of(trainer));
 
-        service.update("Bob.Trainer", new UpdateTrainerCommand("Robert", "Trainer", false));
+        service.update("Bob.Trainer", "Robert", "Trainer", false);
 
         assertThat(trainer.getFirstName()).isEqualTo("Robert");
         assertThat(trainer.getSpecialization()).isSameAs(originalSpecialization);

@@ -5,7 +5,6 @@ import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
@@ -13,8 +12,6 @@ import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.command.CreateTraineeCommand;
-import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -62,14 +60,14 @@ public class TraineeService {
     }
 
     @Transactional
-    public CreatedAccount<Trainee> create(CreateTraineeCommand command) {
-        String username = usernameGenerator.generate(command.firstName(), command.lastName());
+    public CreatedAccount<Trainee> create(String firstName, String lastName, LocalDate dateOfBirth, String address) {
+        String username = usernameGenerator.generate(firstName, lastName);
         String rawPassword = passwordGenerator.generate();
 
         Trainee trainee = new Trainee(
-                new User(command.firstName(), command.lastName(), username, passwordEncoder.encode(rawPassword), command.active()),
-                command.dateOfBirth(),
-                command.address());
+                new User(firstName, lastName, username, passwordEncoder.encode(rawPassword), true),
+                dateOfBirth,
+                address);
         Trainee saved = traineeRepository.save(trainee);
         metrics.recordTraineeRegistration();
         LOGGER.info("Created trainee id={} username={}", saved.getId(), saved.getUsername());
@@ -79,7 +77,7 @@ public class TraineeService {
     @Transactional(readOnly = true)
     public Trainee findByUsername(String username) {
         Trainee authenticated = currentUser.requireTrainee();
-        requireSameUser(authenticated.getUsername(), username, "trainee");
+        requireSameUser(authenticated.getUsername(), username);
         Trainee trainee = traineeRepository.findByUsernameWithTrainers(authenticated.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee", username));
         LOGGER.debug("Selected trainee profile username={}", trainee.getUsername());
@@ -87,13 +85,13 @@ public class TraineeService {
     }
 
     @Transactional
-    public Trainee update(String username, UpdateTraineeCommand command) {
+    public Trainee update(String username, String firstName, String lastName,
+                          LocalDate dateOfBirth, String address, boolean active) {
         Trainee authenticated = currentUser.requireTrainee();
-        requireSameUser(authenticated.getUsername(), username, "trainee");
+        requireSameUser(authenticated.getUsername(), username);
         Trainee trainee = traineeRepository.findByUsernameWithTrainers(authenticated.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee", username));
-        trainee.updateProfile(
-                command.firstName(), command.lastName(), command.dateOfBirth(), command.address(), command.active());
+        trainee.updateProfile(firstName, lastName, dateOfBirth, address, active);
         LOGGER.info("Updated trainee id={} username={}", trainee.getId(), trainee.getUsername());
         return trainee;
     }
@@ -101,7 +99,7 @@ public class TraineeService {
     @Transactional
     public void deleteByUsername(String username) {
         Trainee trainee = currentUser.requireTrainee();
-        requireSameUser(trainee.getUsername(), username, "trainee");
+        requireSameUser(trainee.getUsername(), username);
         trainee.clearTrainers();
         traineeRepository.delete(trainee);
         LOGGER.info("Deleted trainee id={} username={} with cascade trainings", trainee.getId(), trainee.getUsername());
@@ -110,7 +108,7 @@ public class TraineeService {
     @Transactional(readOnly = true)
     public List<Training> getTrainings(String traineeUsername, TraineeTrainingCriteria criteria) {
         Trainee trainee = currentUser.requireTrainee();
-        requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
+        requireSameUser(trainee.getUsername(), traineeUsername);
         List<Training> trainings = trainingRepository.findByTraineeUsername(traineeUsername, criteria);
         LOGGER.debug("Loaded trainee trainings username={} count={}", traineeUsername, trainings.size());
         return trainings;
@@ -119,7 +117,7 @@ public class TraineeService {
     @Transactional(readOnly = true)
     public List<Trainer> getUnassignedTrainers(String traineeUsername) {
         Trainee trainee = currentUser.requireTrainee();
-        requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
+        requireSameUser(trainee.getUsername(), traineeUsername);
         List<Trainer> unassigned = trainerRepository.findUnassignedActiveTrainers(traineeUsername);
         LOGGER.debug("Loaded unassigned trainers for trainee username={} count={}", traineeUsername, unassigned.size());
         return unassigned;
@@ -129,7 +127,7 @@ public class TraineeService {
     public List<Trainer> updateTrainers(String traineeUsername, Collection<String> trainerUsernames) {
         Trainee trainee = traineeRepository.findByUsernameWithTrainers(currentUser.requireTrainee().getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee", traineeUsername));
-        requireSameUser(trainee.getUsername(), traineeUsername, "trainee");
+        requireSameUser(trainee.getUsername(), traineeUsername);
 
         Set<String> requestedUsernames = trainerUsernames == null
                 ? Set.of()
@@ -143,10 +141,9 @@ public class TraineeService {
         return List.copyOf(trainers);
     }
 
-    private void requireSameUser(String authenticatedUsername, String requestedUsername, String profileType) {
-        if (!authenticatedUsername.equalsIgnoreCase(requestedUsername)) {
-            throw new ValidationException("Authenticated " + profileType + " can only access own profile");
-        }
+    private void requireSameUser(String authenticatedUsername, String requestedUsername) {
+        SelfAccess.require(authenticatedUsername, requestedUsername,
+                "Authenticated trainee can only access own profile");
     }
 
     private void validateAllTrainersFound(Set<String> requestedUsernames, List<Trainer> trainers) {

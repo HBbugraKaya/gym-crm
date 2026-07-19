@@ -2,8 +2,6 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.config.OpenApiConfig;
 import com.example.gymcrm.service.TrainerService;
-import com.example.gymcrm.service.command.CreateTrainerCommand;
-import com.example.gymcrm.service.command.UpdateTrainerCommand;
 import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TrainerProfileResponse;
@@ -53,8 +51,8 @@ public class TrainerController {
             @ApiResponse(responseCode = "404", description = "Specialization was not found")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TrainerRegistrationRequest request) {
-        var created = trainerService.create(new CreateTrainerCommand(
-                request.firstName(), request.lastName(), request.specialization(), true));
+        var created = trainerService.create(
+                request.firstName(), request.lastName(), request.specialization());
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toRegistrationResponse(created));
     }
 
@@ -82,10 +80,8 @@ public class TrainerController {
     public TrainerProfileResponse updateProfile(
             @PathVariable String username,
             @Valid @RequestBody UpdateTrainerRequest request) {
-        var updated = trainerService.update(username, new UpdateTrainerCommand(
-                request.firstName(),
-                request.lastName(),
-                request.active()));
+        var updated = trainerService.update(
+                username, request.firstName(), request.lastName(), request.active());
         return mapper.toTrainerProfile(updated);
     }
 

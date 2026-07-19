@@ -6,8 +6,6 @@ import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.service.TraineeService;
 import com.example.gymcrm.service.CreatedAccount;
-import com.example.gymcrm.service.command.CreateTraineeCommand;
-import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TraineeProfileResponse;
@@ -47,18 +45,17 @@ class TraineeControllerTest {
     void registerCreatesActiveTraineeAndReturnsGeneratedCredentials() {
         LocalDate birthDate = LocalDate.of(2001, 1, 1);
         var request = new TraineeRegistrationRequest("John", "Smith", birthDate, "Istanbul");
-        var command = new CreateTraineeCommand("John", "Smith", birthDate, "Istanbul", true);
         Trainee trainee = mock(Trainee.class);
         var created = new CreatedAccount<>(trainee, "generated-password");
         var expected = new RegistrationResponse(USERNAME, "generated-password");
-        when(traineeService.create(command)).thenReturn(created);
+        when(traineeService.create("John", "Smith", birthDate, "Istanbul")).thenReturn(created);
         when(mapper.toRegistrationResponse(created)).thenReturn(expected);
 
         var response = controller.register(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isSameAs(expected);
-        verify(traineeService).create(command);
+        verify(traineeService).create("John", "Smith", birthDate, "Istanbul");
         verify(mapper).toRegistrationResponse(created);
     }
 
@@ -80,17 +77,16 @@ class TraineeControllerTest {
     void updateProfileDelegatesPathAndEditableFields() {
         LocalDate birthDate = LocalDate.of(2000, 2, 2);
         var request = new UpdateTraineeRequest("Johnny", "Smith", birthDate, "Ankara", false);
-        var command = new UpdateTraineeCommand("Johnny", "Smith", birthDate, "Ankara", false);
         Trainee updated = mock(Trainee.class);
         var expected = new TraineeProfileResponse(
                 USERNAME, "Johnny", "Smith", birthDate, "Ankara", false, List.of());
-        when(traineeService.update(USERNAME, command)).thenReturn(updated);
+        when(traineeService.update(USERNAME, "Johnny", "Smith", birthDate, "Ankara", false)).thenReturn(updated);
         when(mapper.toTraineeProfile(updated)).thenReturn(expected);
 
         var result = controller.updateProfile(USERNAME, request);
 
         assertThat(result).isSameAs(expected);
-        verify(traineeService).update(USERNAME, command);
+        verify(traineeService).update(USERNAME, "Johnny", "Smith", birthDate, "Ankara", false);
     }
 
     @Test

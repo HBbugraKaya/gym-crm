@@ -55,8 +55,7 @@ public class UserAccountService {
     }
 
     private void requireOwnAccount(String authenticatedUsername, String targetUsername) {
-        if (!authenticatedUsername.equalsIgnoreCase(targetUsername)) {
-            throw new ValidationException("Authenticated user can only modify own account");
-        }
+        SelfAccess.require(authenticatedUsername, targetUsername,
+                "Authenticated user can only modify own account");
     }
 }

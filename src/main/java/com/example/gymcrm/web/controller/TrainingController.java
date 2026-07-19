@@ -2,7 +2,6 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.config.OpenApiConfig;
 import com.example.gymcrm.service.TrainingService;
-import com.example.gymcrm.service.command.AddTrainingCommand;
 import com.example.gymcrm.web.dto.AddTrainingRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -37,12 +36,12 @@ public class TrainingController {
             @ApiResponse(responseCode = "404", description = "Trainee or training type was not found")
     })
     public ResponseEntity<Void> addTraining(@Valid @RequestBody AddTrainingRequest request) {
-        trainingService.addTraining(new AddTrainingCommand(
+        trainingService.addTraining(
                 request.traineeUsername(),
                 request.trainerUsername(),
                 request.trainingName(),
                 request.trainingDate(),
-                request.durationMinutes()));
+                request.durationMinutes());
         return ResponseEntity.ok().build();
     }
 }

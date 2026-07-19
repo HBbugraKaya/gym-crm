@@ -15,8 +15,6 @@ import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.command.CreateTraineeCommand;
-import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,8 +72,7 @@ class TraineeServiceTest {
         when(passwordEncoder.encode("secret1234")).thenReturn("encoded-secret1234");
         when(traineeRepository.save(any(Trainee.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var created = service.create(new CreateTraineeCommand(
-                "John", "Smith", LocalDate.of(2000, 1, 1), "Address", true));
+        var created = service.create("John", "Smith", LocalDate.of(2000, 1, 1), "Address");
 
         assertThat(created.rawPassword()).isEqualTo("secret1234");
         assertThat(created.profile().getFirstName()).isEqualTo("John");
@@ -104,8 +101,7 @@ class TraineeServiceTest {
         when(currentUser.requireTrainee()).thenReturn(trainee);
         when(traineeRepository.findByUsernameWithTrainers("Jane.Doe")).thenReturn(Optional.of(trainee));
 
-        service.update("Jane.Doe", new UpdateTraineeCommand(
-                "Janet", "Doe", LocalDate.of(1999, 5, 4), "Izmir", false));
+        service.update("Jane.Doe", "Janet", "Doe", LocalDate.of(1999, 5, 4), "Izmir", false);
 
         assertThat(trainee.getFirstName()).isEqualTo("Janet");
         assertThat(trainee.getDateOfBirth()).isEqualTo(LocalDate.of(1999, 5, 4));

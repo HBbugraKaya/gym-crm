@@ -2,8 +2,6 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.config.OpenApiConfig;
 import com.example.gymcrm.service.TraineeService;
-import com.example.gymcrm.service.command.CreateTraineeCommand;
-import com.example.gymcrm.service.command.UpdateTraineeCommand;
 import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TraineeProfileResponse;
@@ -56,8 +54,8 @@ public class TraineeController {
             @ApiResponse(responseCode = "400", description = "Request validation failed")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TraineeRegistrationRequest request) {
-        var created = traineeService.create(new CreateTraineeCommand(
-                request.firstName(), request.lastName(), request.dateOfBirth(), request.address(), true));
+        var created = traineeService.create(
+                request.firstName(), request.lastName(), request.dateOfBirth(), request.address());
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toRegistrationResponse(created));
     }
 
@@ -85,8 +83,13 @@ public class TraineeController {
     public TraineeProfileResponse updateProfile(
             @PathVariable String username,
             @Valid @RequestBody UpdateTraineeRequest request) {
-        var trainee = traineeService.update(username, new UpdateTraineeCommand(
-                request.firstName(), request.lastName(), request.dateOfBirth(), request.address(), request.active()));
+        var trainee = traineeService.update(
+                username,
+                request.firstName(),
+                request.lastName(),
+                request.dateOfBirth(),
+                request.address(),
+                request.active());
         return mapper.toTraineeProfile(trainee);
     }
 

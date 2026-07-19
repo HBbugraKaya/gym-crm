@@ -6,7 +6,6 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
@@ -14,8 +13,6 @@ import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
 import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.command.CreateTrainerCommand;
-import com.example.gymcrm.service.command.UpdateTrainerCommand;
 import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,25 +54,25 @@ public class TrainerService {
     }
 
     @Transactional
-    public CreatedAccount<Trainer> create(CreateTrainerCommand command) {
-        TrainingType specialization = findTrainingType(command.specialization());
-        String username = usernameGenerator.generate(command.firstName(), command.lastName());
+    public CreatedAccount<Trainer> create(String firstName, String lastName, TrainingTypeName specialization) {
+        TrainingType trainingType = findTrainingType(specialization);
+        String username = usernameGenerator.generate(firstName, lastName);
         String rawPassword = passwordGenerator.generate();
 
         Trainer trainer = new Trainer(
-                new User(command.firstName(), command.lastName(), username, passwordEncoder.encode(rawPassword), command.active()),
-                specialization);
+                new User(firstName, lastName, username, passwordEncoder.encode(rawPassword), true),
+                trainingType);
         Trainer saved = trainerRepository.save(trainer);
         metrics.recordTrainerRegistration();
         LOGGER.info("Created trainer id={} username={} specialization={}",
-                saved.getId(), saved.getUsername(), specialization.getName());
+                saved.getId(), saved.getUsername(), trainingType.getName());
         return new CreatedAccount<>(saved, rawPassword);
     }
 
     @Transactional(readOnly = true)
     public Trainer findByUsername(String username) {
         Trainer authenticated = currentUser.requireTrainer();
-        requireSameUser(authenticated.getUsername(), username, "trainer");
+        requireSameUser(authenticated.getUsername(), username);
         Trainer trainer = trainerRepository.findByUsernameWithTrainees(authenticated.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainer", username));
         LOGGER.debug("Selected trainer profile username={}", trainer.getUsername());
@@ -83,12 +80,12 @@ public class TrainerService {
     }
 
     @Transactional
-    public Trainer update(String username, UpdateTrainerCommand command) {
+    public Trainer update(String username, String firstName, String lastName, boolean active) {
         Trainer authenticated = currentUser.requireTrainer();
-        requireSameUser(authenticated.getUsername(), username, "trainer");
+        requireSameUser(authenticated.getUsername(), username);
         Trainer trainer = trainerRepository.findByUsernameWithTrainees(authenticated.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Trainer", username));
-        trainer.updateProfile(command.firstName(), command.lastName(), command.active());
+        trainer.updateProfile(firstName, lastName, active);
         LOGGER.info("Updated trainer id={} username={} specialization={}",
                 trainer.getId(), trainer.getUsername(), trainer.getSpecialization().getName());
         return trainer;
@@ -97,7 +94,7 @@ public class TrainerService {
     @Transactional(readOnly = true)
     public List<Training> getTrainings(String trainerUsername, TrainerTrainingCriteria criteria) {
         Trainer trainer = currentUser.requireTrainer();
-        requireSameUser(trainer.getUsername(), trainerUsername, "trainer");
+        requireSameUser(trainer.getUsername(), trainerUsername);
         List<Training> trainings = trainingRepository.findByTrainerUsername(trainerUsername, criteria);
         LOGGER.debug("Loaded trainer trainings username={} count={}", trainerUsername, trainings.size());
         return trainings;
@@ -108,9 +105,8 @@ public class TrainerService {
                 .orElseThrow(() -> new EntityNotFoundException("TrainingType", name.name()));
     }
 
-    private void requireSameUser(String authenticatedUsername, String requestedUsername, String profileType) {
-        if (!authenticatedUsername.equalsIgnoreCase(requestedUsername)) {
-            throw new ValidationException("Authenticated " + profileType + " can only access own profile");
-        }
+    private void requireSameUser(String authenticatedUsername, String requestedUsername) {
+        SelfAccess.require(authenticatedUsername, requestedUsername,
+                "Authenticated trainer can only access own profile");
     }
 }
