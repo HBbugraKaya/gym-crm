@@ -1,4 +1,4 @@
-package com.example.gymcrm.service.impl;
+package com.example.gymcrm.service;
 
 import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
@@ -7,10 +7,9 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ProfileStateException;
 import com.example.gymcrm.exception.ValidationException;
-import com.example.gymcrm.generator.PasswordGenerator;
-import com.example.gymcrm.generator.UsernameGenerator;
+import com.example.gymcrm.generator.SecurePasswordGenerator;
+import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
@@ -38,7 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TrainerServiceImplTest {
+class TrainerServiceTest {
     @Mock
     private TrainerRepository trainerRepository;
 
@@ -49,10 +48,10 @@ class TrainerServiceImplTest {
     private TrainingRepository trainingRepository;
 
     @Mock
-    private UsernameGenerator usernameGenerator;
+    private UniqueUsernameGenerator usernameGenerator;
 
     @Mock
-    private PasswordGenerator passwordGenerator;
+    private SecurePasswordGenerator passwordGenerator;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -64,7 +63,7 @@ class TrainerServiceImplTest {
     private GymCrmMetrics metrics;
 
     @InjectMocks
-    private TrainerServiceImpl service;
+    private TrainerService service;
 
     @Test
     void createResolvesSpecializationGeneratesCredentialsAndSavesTrainer() {
@@ -101,6 +100,7 @@ class TrainerServiceImplTest {
     void findByUsernameReturnsAuthenticatedTrainerOnlyForOwnUsername() {
         Trainer trainer = trainer("Bob.Trainer", TrainingTypeName.CARDIO, true);
         when(currentUser.requireTrainer()).thenReturn(trainer);
+        when(trainerRepository.findByUsernameWithTrainees("Bob.Trainer")).thenReturn(Optional.of(trainer));
 
         assertThat(service.findByUsername("bob.trainer")).isSameAs(trainer);
         assertThatThrownBy(() -> service.findByUsername("Other.Trainer"))
@@ -108,31 +108,18 @@ class TrainerServiceImplTest {
     }
 
     @Test
-    void updateAndChangePasswordMutateTrainerButKeepSpecializationReadOnly() {
+    void updateMutatesTrainerButKeepsSpecializationReadOnly() {
         Trainer trainer = trainer("Bob.Trainer", TrainingTypeName.CARDIO, true);
         TrainingType originalSpecialization = trainer.getSpecialization();
         when(currentUser.requireTrainer()).thenReturn(trainer);
-        when(passwordEncoder.encode("newPassword")).thenReturn("encoded-newPassword");
+        when(trainerRepository.findByUsernameWithTrainees("Bob.Trainer")).thenReturn(Optional.of(trainer));
 
         service.update("Bob.Trainer", new UpdateTrainerCommand("Robert", "Trainer", false));
-        service.changePassword("newPassword");
 
         assertThat(trainer.getFirstName()).isEqualTo("Robert");
         assertThat(trainer.getSpecialization()).isSameAs(originalSpecialization);
         assertThat(trainer.isActive()).isFalse();
-        assertThat(trainer.getPassword()).isEqualTo("encoded-newPassword");
         verify(trainingTypeRepository, never()).findByName(any());
-    }
-
-    @Test
-    void statusChangesRejectRepeatedState() {
-        Trainer trainer = trainer("Bob.Trainer", TrainingTypeName.CARDIO, true);
-        when(currentUser.requireTrainer()).thenReturn(trainer);
-
-        assertThat(service.deactivate()).isSameAs(trainer);
-        assertThat(trainer.isActive()).isFalse();
-        assertThatThrownBy(() -> service.deactivate())
-                .isInstanceOf(ProfileStateException.class);
     }
 
     @Test

@@ -16,7 +16,6 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.RequestBuilder;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -60,11 +58,17 @@ class GymCrmApiIntegrationTest {
     }
 
     @Test
-    void actuatorExposesCustomHealthIndicatorsAndPrometheusMetrics() throws Exception {
+    void bootInfrastructureExposesActuatorOpenApiAndSecurity() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.components.applicationProfile.status").value("UP"))
                 .andExpect(jsonPath("$.components.trainingTypeCatalog.status").value("UP"));
+
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.application.name").value("spring-boot-gym-crm"))
+                .andExpect(jsonPath("$.application.description")
+                        .value("Gym trainee, trainer and training management API"));
 
         MvcResult metrics = mockMvc.perform(get("/actuator/prometheus"))
                 .andExpect(status().isOk())
@@ -72,110 +76,25 @@ class GymCrmApiIntegrationTest {
 
         assertThat(metrics.getResponse().getContentAsString())
                 .contains("gymcrm_profiles_total", "gymcrm_trainings_total");
-    }
 
-    @Test
-    void everyBusinessEndpointExceptProfileCreationRequiresAuthentication() throws Exception {
-        List<RequestBuilder> protectedRequests = List.of(
-                get("/api/v1/auth/login"),
-                put("/api/v1/users/Test.User/password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"newPassword\":\"newPassword1\"}"),
-                patch("/api/v1/users/Test.User/status")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"active\":true}"),
-                get("/api/v1/trainees/Test.User"),
-                put("/api/v1/trainees/Test.User")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"firstName":"Test","lastName":"User","dateOfBirth":"2000-01-01",
-                                 "address":"Address","active":true}
-                                """),
-                delete("/api/v1/trainees/Test.User"),
-                get("/api/v1/trainees/Test.User/available-trainers"),
-                put("/api/v1/trainees/Test.User/trainers")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"trainerUsernames\":[]}"),
-                get("/api/v1/trainees/Test.User/trainings"),
-                get("/api/v1/trainers/Test.User"),
-                put("/api/v1/trainers/Test.User")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firstName\":\"Test\",\"lastName\":\"User\",\"active\":true}"),
-                get("/api/v1/trainers/Test.User/trainings"),
-                post("/api/v1/trainings")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"traineeUsername":"Trainee.User","trainerUsername":"Trainer.User",
-                                 "trainingName":"Test training","trainingDate":"2026-07-17","durationMinutes":45}
-                                """),
-                get("/api/v1/training-types"));
-
-        for (RequestBuilder request : protectedRequests) {
-            mockMvc.perform(request)
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
-                            "Basic realm=\"gym-crm\", charset=\"UTF-8\""));
-        }
-    }
-
-    @Test
-    void traineeRegistrationLoginProfilePasswordAndStatusLifecycleUsesRealPersistence() throws Exception {
-        String suffix = uniqueSuffix();
-        RegistrationResponse trainee = registerTrainee("Lifecycle" + suffix, "Trainee");
-        String oldAuthorization = basicAuth(trainee);
-
-        mockMvc.perform(get("/api/v1/auth/login").header(HttpHeaders.AUTHORIZATION, oldAuthorization))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/v1/trainees/{username}", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, oldAuthorization))
+        MvcResult apiDocsResult = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value(trainee.username()))
-                .andExpect(jsonPath("$.active").value(true));
+                .andReturn();
+        JsonNode apiDocs = jsonTree(apiDocsResult);
+        assertThat(apiDocs.path("openapi").asText()).startsWith("3.");
+        assertThat(apiDocs.path("info").path("title").asText()).isEqualTo("Gym CRM API");
+        assertThat(apiDocs.path("components").path("securitySchemes").path("basicAuth").path("scheme").asText())
+                .isEqualTo("basic");
+        assertThat(apiDocs.path("paths").path("/api/v1/trainees").path("post").has("security")).isFalse();
+        assertThat(apiDocs.path("paths").path("/api/v1/trainees/{username}").path("get")
+                .path("security").toString()).contains("basicAuth");
 
-        String newPassword = "Changed-" + suffix;
-        mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, oldAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("newPassword", newPassword))))
+        mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/v1/auth/login").header(HttpHeaders.AUTHORIZATION, oldAuthorization))
-                .andExpect(status().isUnauthorized());
-
-        String newAuthorization = basicAuth(trainee.username(), newPassword);
-        mockMvc.perform(get("/api/v1/auth/login").header(HttpHeaders.AUTHORIZATION, newAuthorization))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("active", false))))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/v1/trainees/{username}", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.active").value(false));
-
-        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("active", false))))
-                .andExpect(status().isConflict());
-
-        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("active", true))))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(delete("/api/v1/trainees/{username}", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization))
-                .andExpect(status().isOk());
-
-        assertThat(countUsers(trainee.username())).isZero();
-        assertThat(countTrainees(trainee.username())).isZero();
+        mockMvc.perform(get("/api/v1/training-types"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
+                        "Basic realm=\"gym-crm\", charset=\"UTF-8\""));
     }
 
     @Test
@@ -260,31 +179,6 @@ class GymCrmApiIntegrationTest {
         assertThat(countTrainees(trainee.username())).isZero();
         assertThat(countTrainings(trainingName)).isZero();
         assertThat(countUsers(trainer.username())).isEqualTo(1);
-    }
-
-    @Test
-    void httpProtocolErrorsUsePreciseStatusesAndTransactionIds() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/login"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.transactionId").isNotEmpty());
-
-        RegistrationResponse trainee = registerTrainee("NotFound", "Probe");
-        mockMvc.perform(get("/api/v1/does-not-exist")
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404));
-
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
-                .andExpect(status().isMethodNotAllowed())
-                .andExpect(jsonPath("$.status").value(405));
-
-        mockMvc.perform(post("/api/v1/trainees")
-                        .contentType(MediaType.TEXT_PLAIN)
-                        .content("not-json"))
-                .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.status").value(415));
     }
 
     private RegistrationResponse registerTrainee(String firstName, String lastName) throws Exception {

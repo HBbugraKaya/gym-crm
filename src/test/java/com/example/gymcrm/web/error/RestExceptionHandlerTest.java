@@ -11,13 +11,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -66,6 +70,20 @@ class RestExceptionHandlerTest {
                 .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(handler.handleBadRequest(new ValidationException("firstName is required"), request)
                 .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void mapsHttpProtocolExceptionsWithoutStartingSpring() {
+        var unsupportedMediaType = new HttpMediaTypeNotSupportedException(
+                MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON));
+
+        assertThat(handler.handleNoResource(new Exception("missing"), request).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(handler.handleMethodNotAllowed(
+                new HttpRequestMethodNotSupportedException("POST"), request).getStatusCode())
+                .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(handler.handleUnsupportedMediaType(unsupportedMediaType, request).getStatusCode())
+                .isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
     }
 
     @Test

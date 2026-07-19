@@ -1,4 +1,4 @@
-package com.example.gymcrm.service.impl;
+package com.example.gymcrm.service;
 
 import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
@@ -15,12 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TrainingTypeServiceImplTest {
+class TrainingTypeServiceTest {
     @Mock
     private TrainingTypeRepository trainingTypeRepository;
 
     @InjectMocks
-    private TrainingTypeServiceImpl service;
+    private TrainingTypeService service;
 
     @Test
     void findAllReturnsRepositoryTrainingTypesInOrder() {

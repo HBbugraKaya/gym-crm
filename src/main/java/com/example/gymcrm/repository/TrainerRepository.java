@@ -1,6 +1,7 @@
 package com.example.gymcrm.repository;
 
 import com.example.gymcrm.domain.Trainer;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +15,9 @@ public interface TrainerRepository extends JpaRepository<Trainer, Long> {
 
     Optional<Trainer> findByUserUsernameIgnoreCase(String username);
 
+    @EntityGraph(attributePaths = {"trainees", "trainees.user"})
+    Optional<Trainer> findDistinctByUserUsernameIgnoreCase(String username);
+
     @Query("SELECT t FROM Trainer t WHERE t.user.active = true AND t NOT IN (SELECT tr FROM Trainee trainee JOIN trainee.trainers tr WHERE lower(trainee.user.username) = lower(:traineeUsername))")
     List<Trainer> findUnassignedActiveTrainers(@Param("traineeUsername") String traineeUsername);
 
@@ -21,6 +25,10 @@ public interface TrainerRepository extends JpaRepository<Trainer, Long> {
 
     default Optional<Trainer> findByUsername(String username) {
         return findByUserUsernameIgnoreCase(UsernameNormalizer.trim(username));
+    }
+
+    default Optional<Trainer> findByUsernameWithTrainees(String username) {
+        return findDistinctByUserUsernameIgnoreCase(UsernameNormalizer.trim(username));
     }
 
     default List<Trainer> findAllByUsernames(Collection<String> usernames) {

@@ -1,4 +1,4 @@
-package com.example.gymcrm.service.impl;
+package com.example.gymcrm.service;
 
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.ProfileStateException;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class UserAccountServiceImplTest {
+class UserAccountServiceTest {
     @Mock
     private UserRepository userRepository;
 
@@ -32,7 +32,7 @@ class UserAccountServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @InjectMocks
-    private UserAccountServiceImpl service;
+    private UserAccountService service;
 
     @Test
     void changePasswordEncodesAndMutatesOnlyAuthenticatedOwnAccount() {

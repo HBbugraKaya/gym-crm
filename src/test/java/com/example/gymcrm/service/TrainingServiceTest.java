@@ -1,4 +1,4 @@
-package com.example.gymcrm.service.impl;
+package com.example.gymcrm.service;
 
 import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TrainingServiceImplTest {
+class TrainingServiceTest {
     @Mock
     private TrainingRepository trainingRepository;
 
@@ -49,7 +49,7 @@ class TrainingServiceImplTest {
     private GymCrmMetrics metrics;
 
     @InjectMocks
-    private TrainingServiceImpl service;
+    private TrainingService service;
 
     @Test
     void addTrainingAuthenticatesTrainerLoadsReferencesAssignsTrainerAndSavesTraining() {

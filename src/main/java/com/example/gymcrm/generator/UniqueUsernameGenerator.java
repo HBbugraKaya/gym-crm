@@ -4,14 +4,13 @@ import com.example.gymcrm.repository.UserRepository;
 import org.springframework.stereotype.Component;
 
 @Component
-public class UniqueUsernameGenerator implements UsernameGenerator {
+public class UniqueUsernameGenerator {
     private final UserRepository userRepository;
 
     public UniqueUsernameGenerator(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
-    @Override
     public String generate(String firstName, String lastName) {
         String trimmedFirstName = firstName.trim();
         String trimmedLastName = lastName.trim();

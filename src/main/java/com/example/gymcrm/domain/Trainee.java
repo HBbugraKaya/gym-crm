@@ -109,14 +109,6 @@ public class Trainee {
         this.address = address;
     }
 
-    public void changePassword(String password) {
-        user.changePassword(password);
-    }
-
-    public void setActive(boolean active) {
-        user.setActive(active);
-    }
-
     public void assignTrainer(Trainer trainer) {
         if (trainers.add(trainer)) {
             trainer.getTraineesInternal().add(this);

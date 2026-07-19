@@ -1,5 +1,6 @@
 package com.example.gymcrm.web.controller;
 
+import com.example.gymcrm.config.OpenApiConfig;
 import com.example.gymcrm.service.TraineeService;
 import com.example.gymcrm.service.command.CreateTraineeCommand;
 import com.example.gymcrm.service.command.UpdateTraineeCommand;
@@ -13,10 +14,11 @@ import com.example.gymcrm.web.dto.TrainerSummaryResponse;
 import com.example.gymcrm.web.dto.UpdateTraineeRequest;
 import com.example.gymcrm.web.mapper.GymWebMapper;
 import com.example.gymcrm.domain.TrainingTypeName;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -36,7 +38,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/trainees")
-@Api(tags = "Trainees")
+@Tag(name = "Trainees", description = "Trainee registration, profiles, assignments and training history")
 public class TraineeController {
     private final TraineeService traineeService;
     private final GymWebMapper mapper;
@@ -47,12 +49,11 @@ public class TraineeController {
     }
 
     @PostMapping
-    @ApiOperation(value = "Register a trainee",
-            notes = "Public endpoint that generates and returns a username and password.",
-            response = RegistrationResponse.class)
+    @Operation(summary = "Register a trainee",
+            description = "Public endpoint that generates and returns a username and password.")
     @ApiResponses({
-            @ApiResponse(code = 201, message = "Trainee registered"),
-            @ApiResponse(code = 400, message = "Request validation failed")
+            @ApiResponse(responseCode = "201", description = "Trainee registered"),
+            @ApiResponse(responseCode = "400", description = "Request validation failed")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TraineeRegistrationRequest request) {
         var created = traineeService.create(new CreateTraineeCommand(
@@ -61,24 +62,25 @@ public class TraineeController {
     }
 
     @GetMapping("/{username}")
-    @ApiOperation(value = "Get trainee profile", response = TraineeProfileResponse.class)
+    @Operation(summary = "Get trainee profile")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainee profile returned"),
-            @ApiResponse(code = 400, message = "Authenticated trainee differs from the requested username"),
-            @ApiResponse(code = 401, message = "Trainee credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainee profile returned"),
+            @ApiResponse(responseCode = "400", description = "Authenticated trainee differs from the requested username"),
+            @ApiResponse(responseCode = "401", description = "Trainee credentials are invalid")
     })
     public TraineeProfileResponse getProfile(@PathVariable String username) {
         return mapper.toTraineeProfile(traineeService.findByUsername(username));
     }
 
     @PutMapping("/{username}")
-    @ApiOperation(value = "Update trainee profile",
-            notes = "Replaces editable profile fields. Username cannot be changed.",
-            response = TraineeProfileResponse.class)
+    @Operation(summary = "Update trainee profile",
+            description = "Replaces editable profile fields. Username cannot be changed.")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainee profile updated"),
-            @ApiResponse(code = 400, message = "Request validation failed or usernames differ"),
-            @ApiResponse(code = 401, message = "Trainee credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainee profile updated"),
+            @ApiResponse(responseCode = "400", description = "Request validation failed or usernames differ"),
+            @ApiResponse(responseCode = "401", description = "Trainee credentials are invalid")
     })
     public TraineeProfileResponse updateProfile(
             @PathVariable String username,
@@ -89,12 +91,13 @@ public class TraineeController {
     }
 
     @DeleteMapping("/{username}")
-    @ApiOperation(value = "Delete trainee profile",
-            notes = "Hard-deletes the trainee, its user record, assignments, and relevant trainings.")
+    @Operation(summary = "Delete trainee profile",
+            description = "Hard-deletes the trainee, its user record, assignments, and relevant trainings.")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainee deleted"),
-            @ApiResponse(code = 400, message = "Authenticated trainee differs from the requested username"),
-            @ApiResponse(code = 401, message = "Trainee credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainee deleted"),
+            @ApiResponse(responseCode = "400", description = "Authenticated trainee differs from the requested username"),
+            @ApiResponse(responseCode = "401", description = "Trainee credentials are invalid")
     })
     public ResponseEntity<Void> deleteProfile(@PathVariable String username) {
         traineeService.deleteByUsername(username);
@@ -102,29 +105,27 @@ public class TraineeController {
     }
 
     @GetMapping("/{username}/available-trainers")
-    @ApiOperation(value = "Get active trainers not assigned to the trainee",
-            response = TrainerSummaryResponse.class,
-            responseContainer = "List")
+    @Operation(summary = "Get active trainers not assigned to the trainee")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Available trainers returned"),
-            @ApiResponse(code = 400, message = "Authenticated trainee differs from the requested username"),
-            @ApiResponse(code = 401, message = "Trainee credentials are invalid"),
-            @ApiResponse(code = 404, message = "Trainee was not found")
+            @ApiResponse(responseCode = "200", description = "Available trainers returned"),
+            @ApiResponse(responseCode = "400", description = "Authenticated trainee differs from the requested username"),
+            @ApiResponse(responseCode = "401", description = "Trainee credentials are invalid"),
+            @ApiResponse(responseCode = "404", description = "Trainee was not found")
     })
     public List<TrainerSummaryResponse> getAvailableTrainers(@PathVariable String username) {
         return mapper.toTrainerSummaries(traineeService.getUnassignedTrainers(username));
     }
 
     @PutMapping("/{username}/trainers")
-    @ApiOperation(value = "Update trainee trainer list",
-            notes = "Replaces the complete trainer assignment list.",
-            response = TrainerSummaryResponse.class,
-            responseContainer = "List")
+    @Operation(summary = "Update trainee trainer list",
+            description = "Replaces the complete trainer assignment list.")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainer assignments updated"),
-            @ApiResponse(code = 400, message = "Request validation failed or usernames differ"),
-            @ApiResponse(code = 401, message = "Trainee credentials are invalid"),
-            @ApiResponse(code = 404, message = "Trainee or a requested trainer was not found")
+            @ApiResponse(responseCode = "200", description = "Trainer assignments updated"),
+            @ApiResponse(responseCode = "400", description = "Request validation failed or usernames differ"),
+            @ApiResponse(responseCode = "401", description = "Trainee credentials are invalid"),
+            @ApiResponse(responseCode = "404", description = "Trainee or a requested trainer was not found")
     })
     public List<TrainerSummaryResponse> updateTrainers(
             @PathVariable String username,
@@ -134,14 +135,13 @@ public class TraineeController {
     }
 
     @GetMapping("/{username}/trainings")
-    @ApiOperation(value = "Get trainee trainings",
-            notes = "Supports optional date, trainer-name, and training-type filters.",
-            response = TraineeTrainingResponse.class,
-            responseContainer = "List")
+    @Operation(summary = "Get trainee trainings",
+            description = "Supports optional date, trainer-name, and training-type filters.")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainings returned"),
-            @ApiResponse(code = 400, message = "Filter values are invalid or usernames differ"),
-            @ApiResponse(code = 401, message = "Trainee credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainings returned"),
+            @ApiResponse(responseCode = "400", description = "Filter values are invalid or usernames differ"),
+            @ApiResponse(responseCode = "401", description = "Trainee credentials are invalid")
     })
     public List<TraineeTrainingResponse> getTrainings(
             @PathVariable String username,

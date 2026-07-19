@@ -12,6 +12,9 @@ spring:
       add-mappings: false
 
 management:
+  info:
+    env:
+      enabled: true
   prometheus:
     metrics:
       export:
@@ -30,7 +33,9 @@ info:
     description: Gym trainee, trainer and training management API
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [transactionId=%X{transactionId:-none}] [%thread] %logger{36} - %msg%n"
   level:
     com.example.gymcrm: INFO
     org.hibernate.SQL: WARN
-    org.hibernate.orm.jdbc.bind: OFF
+    org.hibernate.orm.jdbc.bind: "OFF"

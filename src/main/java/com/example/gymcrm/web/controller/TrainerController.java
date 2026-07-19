@@ -1,5 +1,6 @@
 package com.example.gymcrm.web.controller;
 
+import com.example.gymcrm.config.OpenApiConfig;
 import com.example.gymcrm.service.TrainerService;
 import com.example.gymcrm.service.command.CreateTrainerCommand;
 import com.example.gymcrm.service.command.UpdateTrainerCommand;
@@ -10,10 +11,11 @@ import com.example.gymcrm.web.dto.TrainerRegistrationRequest;
 import com.example.gymcrm.web.dto.TrainerTrainingResponse;
 import com.example.gymcrm.web.dto.UpdateTrainerRequest;
 import com.example.gymcrm.web.mapper.GymWebMapper;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -32,7 +34,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/trainers")
-@Api(tags = "Trainers")
+@Tag(name = "Trainers", description = "Trainer registration, profiles and training history")
 public class TrainerController {
     private final TrainerService trainerService;
     private final GymWebMapper mapper;
@@ -43,13 +45,12 @@ public class TrainerController {
     }
 
     @PostMapping
-    @ApiOperation(value = "Register a trainer",
-            notes = "Public endpoint that generates and returns a username and password.",
-            response = RegistrationResponse.class)
+    @Operation(summary = "Register a trainer",
+            description = "Public endpoint that generates and returns a username and password.")
     @ApiResponses({
-            @ApiResponse(code = 201, message = "Trainer registered"),
-            @ApiResponse(code = 400, message = "Request validation failed"),
-            @ApiResponse(code = 404, message = "Specialization was not found")
+            @ApiResponse(responseCode = "201", description = "Trainer registered"),
+            @ApiResponse(responseCode = "400", description = "Request validation failed"),
+            @ApiResponse(responseCode = "404", description = "Specialization was not found")
     })
     public ResponseEntity<RegistrationResponse> register(@Valid @RequestBody TrainerRegistrationRequest request) {
         var created = trainerService.create(new CreateTrainerCommand(
@@ -58,24 +59,25 @@ public class TrainerController {
     }
 
     @GetMapping("/{username}")
-    @ApiOperation(value = "Get trainer profile", response = TrainerProfileResponse.class)
+    @Operation(summary = "Get trainer profile")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainer profile returned"),
-            @ApiResponse(code = 400, message = "Authenticated trainer differs from the requested username"),
-            @ApiResponse(code = 401, message = "Trainer credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainer profile returned"),
+            @ApiResponse(responseCode = "400", description = "Authenticated trainer differs from the requested username"),
+            @ApiResponse(responseCode = "401", description = "Trainer credentials are invalid")
     })
     public TrainerProfileResponse getProfile(@PathVariable String username) {
         return mapper.toTrainerProfile(trainerService.findByUsername(username));
     }
 
     @PutMapping("/{username}")
-    @ApiOperation(value = "Update trainer profile",
-            notes = "Replaces editable profile fields. Username and specialization are read-only.",
-            response = TrainerProfileResponse.class)
+    @Operation(summary = "Update trainer profile",
+            description = "Replaces editable profile fields. Username and specialization are read-only.")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainer profile updated"),
-            @ApiResponse(code = 400, message = "Request validation failed or usernames differ"),
-            @ApiResponse(code = 401, message = "Trainer credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainer profile updated"),
+            @ApiResponse(responseCode = "400", description = "Request validation failed or usernames differ"),
+            @ApiResponse(responseCode = "401", description = "Trainer credentials are invalid")
     })
     public TrainerProfileResponse updateProfile(
             @PathVariable String username,
@@ -88,14 +90,13 @@ public class TrainerController {
     }
 
     @GetMapping("/{username}/trainings")
-    @ApiOperation(value = "Get trainer trainings",
-            notes = "Supports optional date and trainee-name filters.",
-            response = TrainerTrainingResponse.class,
-            responseContainer = "List")
+    @Operation(summary = "Get trainer trainings",
+            description = "Supports optional date and trainee-name filters.")
+    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
     @ApiResponses({
-            @ApiResponse(code = 200, message = "Trainings returned"),
-            @ApiResponse(code = 400, message = "Filter values are invalid or usernames differ"),
-            @ApiResponse(code = 401, message = "Trainer credentials are invalid")
+            @ApiResponse(responseCode = "200", description = "Trainings returned"),
+            @ApiResponse(responseCode = "400", description = "Filter values are invalid or usernames differ"),
+            @ApiResponse(responseCode = "401", description = "Trainer credentials are invalid")
     })
     public List<TrainerTrainingResponse> getTrainings(
             @PathVariable String username,

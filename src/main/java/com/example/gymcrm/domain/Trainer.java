@@ -94,14 +94,6 @@ public class Trainer {
         user.setActive(active);
     }
 
-    public void changePassword(String password) {
-        user.changePassword(password);
-    }
-
-    public void setActive(boolean active) {
-        user.setActive(active);
-    }
-
     Set<Trainee> getTraineesInternal() {
         return trainees;
     }

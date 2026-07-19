@@ -1,4 +1,4 @@
-package com.example.gymcrm.service.impl;
+package com.example.gymcrm.service;
 
 import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
@@ -7,10 +7,9 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ProfileStateException;
 import com.example.gymcrm.exception.ValidationException;
-import com.example.gymcrm.generator.PasswordGenerator;
-import com.example.gymcrm.generator.UsernameGenerator;
+import com.example.gymcrm.generator.SecurePasswordGenerator;
+import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
@@ -36,12 +35,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TraineeServiceImplTest {
+class TraineeServiceTest {
     @Mock
     private TraineeRepository traineeRepository;
 
@@ -52,10 +50,10 @@ class TraineeServiceImplTest {
     private TrainingRepository trainingRepository;
 
     @Mock
-    private UsernameGenerator usernameGenerator;
+    private UniqueUsernameGenerator usernameGenerator;
 
     @Mock
-    private PasswordGenerator passwordGenerator;
+    private SecurePasswordGenerator passwordGenerator;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -67,7 +65,7 @@ class TraineeServiceImplTest {
     private GymCrmMetrics metrics;
 
     @InjectMocks
-    private TraineeServiceImpl service;
+    private TraineeService service;
 
     @Test
     void createGeneratesCredentialsEncodesPasswordAndSavesTrainee() {
@@ -93,6 +91,7 @@ class TraineeServiceImplTest {
     void findByUsernameReturnsAuthenticatedTraineeOnlyForOwnUsername() {
         Trainee trainee = trainee("John.Smith", true);
         when(currentUser.requireTrainee()).thenReturn(trainee);
+        when(traineeRepository.findByUsernameWithTrainers("John.Smith")).thenReturn(Optional.of(trainee));
 
         assertThat(service.findByUsername("john.smith")).isSameAs(trainee);
         assertThatThrownBy(() -> service.findByUsername("Other.User"))
@@ -100,42 +99,18 @@ class TraineeServiceImplTest {
     }
 
     @Test
-    void updateAndChangePasswordMutateAuthenticatedTrainee() {
+    void updateMutatesAuthenticatedTrainee() {
         Trainee trainee = trainee("Jane.Doe", true);
         when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(passwordEncoder.encode("newPassword")).thenReturn("encoded-newPassword");
+        when(traineeRepository.findByUsernameWithTrainers("Jane.Doe")).thenReturn(Optional.of(trainee));
 
         service.update("Jane.Doe", new UpdateTraineeCommand(
                 "Janet", "Doe", LocalDate.of(1999, 5, 4), "Izmir", false));
-        service.changePassword("newPassword");
 
         assertThat(trainee.getFirstName()).isEqualTo("Janet");
         assertThat(trainee.getDateOfBirth()).isEqualTo(LocalDate.of(1999, 5, 4));
         assertThat(trainee.getAddress()).isEqualTo("Izmir");
         assertThat(trainee.isActive()).isFalse();
-        assertThat(trainee.getPassword()).isEqualTo("encoded-newPassword");
-    }
-
-    @Test
-    void statusChangesRejectRepeatedState() {
-        Trainee trainee = trainee("Jane.Doe", true);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-
-        assertThat(service.deactivate()).isSameAs(trainee);
-        assertThat(trainee.isActive()).isFalse();
-        assertThatThrownBy(() -> service.deactivate())
-                .isInstanceOf(ProfileStateException.class);
-    }
-
-    @Test
-    void activateChangesInactiveTraineeAndRejectsRepeatedActiveState() {
-        Trainee trainee = trainee("Jane.Doe", false);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-
-        assertThat(service.activate()).isSameAs(trainee);
-        assertThat(trainee.isActive()).isTrue();
-        assertThatThrownBy(() -> service.activate())
-                .isInstanceOf(ProfileStateException.class);
     }
 
     @Test
