@@ -4,17 +4,18 @@ Java 21 and Spring Boot REST API for managing trainees, trainers, assignments an
 
 ## Architecture
 
-The application keeps the existing layered design and lets Spring Boot own infrastructure bootstrap:
+The application uses a small layered design and lets Spring Boot own framework concerns:
 
-- `web`: REST controllers, DTO mapping, error handling and transaction-ID filtering
-- `config`: Spring Boot application configuration and startup data initialization
-- `service`: use cases and transaction boundaries; profile access uses the Spring Security context
-- `repository`: Spring Data JPA derived queries / `@EntityGraph`; custom fragment only for dynamic training filters
-- `security`: HTTP Basic authentication, BCrypt password hashing and `CurrentUser` helpers
+- `web`: REST controllers, DTO mapping, OpenAPI metadata and transaction-ID filtering
+- `bootstrap`: startup data initialization
+- `service`: use cases, transaction boundaries and method-level authorization
+- `repository`: Spring Data JPA derived queries and focused `@EntityGraph` declarations
+- `security`: Spring Security HTTP Basic authentication and BCrypt password hashing
 - `domain`: trainees, trainers, users, training types and trainings
 - `observability`: Actuator health indicators and low-cardinality Micrometer metrics
 
-JWT, Flyway and Docker are intentionally out of scope for this module.
+There are no custom authentication principals, repository implementations or framework-level error wrappers.
+JWT, Flyway and Docker are intentionally out of scope.
 
 ## Build and run
 
@@ -22,7 +23,7 @@ Requirements:
 
 - JDK 21 or newer
 
-Run all tests and the coverage gate:
+Run all tests and the 80% line-coverage gate:
 
 ```powershell
 ./mvnw.cmd clean verify
@@ -69,10 +70,12 @@ Trainee and trainer registration (`POST /api/v1/trainees`, `POST /api/v1/trainer
 other `/api/**` endpoint requires HTTP Basic credentials validated by Spring Security. Passwords are
 stored with BCrypt; registration still returns the one-time plaintext password in the response body.
 Profile-specific operations verify that the authenticated username matches the requested profile.
+Spring Method Security owns the role and self-access checks.
 Inactive users can still authenticate because `UserDetails.isEnabled()` is always true.
 
 Actuator endpoints (`/actuator/**`) are public operational endpoints and do not require gym credentials.
-Unauthorized API requests return JSON `ApiError` responses with `WWW-Authenticate: Basic realm="gym-crm"`.
+HTTP and validation errors use Spring Boot's standard responses. Unauthorized requests include
+`WWW-Authenticate: Basic realm="gym-crm"`.
 
 ## OpenAPI and Swagger UI
 
@@ -82,7 +85,7 @@ Springdoc generates an OpenAPI 3 description and an interactive Swagger UI from 
 - OpenAPI JSON: `/v3/api-docs`
 - Swagger UI: `/swagger-ui/index.html`
 
-The documentation declares the API title/version, endpoint tags and responses, and the HTTP Basic security scheme.
+The documentation declares the API title/version, endpoint tags and the HTTP Basic security scheme.
 Profile registration operations are documented as public; protected operations reference `basicAuth`. Documentation
 endpoints are public so the API can be explored before credentials are created.
 
@@ -104,7 +107,7 @@ Custom business metrics:
 - `gymcrm.trainings.created`
 
 Prometheus exports these counters as `gymcrm_profiles_total` and `gymcrm_trainings_total`. Counters are incremented
-only after the related database transaction commits.
+when the related service operation succeeds.
 
 ## Logging
 
@@ -114,7 +117,6 @@ and dates of birth are never logged. Application logging is `DEBUG` in local/dev
 
 ## Tests
 
-The suite prefers plain JUnit/Mockito unit tests for business rules, controllers, validation, mapping, filters and
-error handling. Two Spring Boot/H2/MockMvc integration scenarios are retained only for framework wiring that unit
-tests cannot prove: Actuator/OpenAPI/Security exposure and the JPA assignment/training/cascade lifecycle. JaCoCo
-fails the build below 80% line coverage.
+The suite prefers plain JUnit/Mockito unit tests for business rules, controllers, validation, mapping and filters.
+Spring Boot/H2/MockMvc integration tests cover framework wiring, cross-profile authorization and the complete
+assignment/training/cascade lifecycle. JaCoCo fails the build below 80% line coverage.
