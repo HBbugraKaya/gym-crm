@@ -12,15 +12,12 @@ public class UniqueUsernameGenerator {
     }
 
     public String generate(String firstName, String lastName) {
-        String trimmedFirstName = firstName.trim();
-        String trimmedLastName = lastName.trim();
-        String base = trimmedFirstName + "." + trimmedLastName;
-        long suffix = userRepository.countByFirstNameAndLastName(trimmedFirstName, trimmedLastName);
-
-        String candidate = suffix == 0 ? base : base + suffix;
-        while (userRepository.existsByUsername(candidate)) {
-            suffix++;
+        String base = firstName.trim() + "." + lastName.trim();
+        String candidate = base;
+        int suffix = 1;
+        while (userRepository.existsByUsernameIgnoreCase(candidate)) {
             candidate = base + suffix;
+            suffix++;
         }
         return candidate;
     }

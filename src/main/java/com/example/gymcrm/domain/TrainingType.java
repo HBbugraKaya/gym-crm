@@ -1,45 +1,24 @@
 package com.example.gymcrm.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "training_types", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_training_types_name", columnNames = "training_type_name")
-})
+@Table(name = "training_types")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TrainingType {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "training_type_name", nullable = false, updatable = false)
+    @Column(name = "training_type_name", nullable = false, updatable = false, unique = true)
     private TrainingTypeName name;
-
-    protected TrainingType() {
-    }
 
     public TrainingType(TrainingTypeName name) {
         this.name = name;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public TrainingTypeName getName() {
-        return name;
-    }
-
-    @Override
-    public String toString() {
-        return "TrainingType{id=" + id + ", name=" + name + '}';
     }
 }

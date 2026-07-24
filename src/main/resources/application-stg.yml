@@ -6,7 +6,6 @@ spring:
     url: ${GYMCRM_STG_DB_URL}
     username: ${GYMCRM_STG_DB_USERNAME}
     password: ${GYMCRM_STG_DB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: validate
