@@ -34,11 +34,10 @@ class GymUserDetailsServiceTest {
     @Test
     void loadUserByUsernameAssignsTraineeAndTrainerRoles() {
         User user = new User("John", "Smith", "john.smith", "encoded", true);
-        when(userRepository.findByUsername("john.smith")).thenReturn(Optional.of(user));
-        when(traineeRepository.findByUsername("john.smith")).thenReturn(Optional.of(mockTrainee()));
-        when(trainerRepository.findByUsername("john.smith")).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameIgnoreCase("john.smith")).thenReturn(Optional.of(user));
+        when(traineeRepository.existsByUserUsernameIgnoreCase("john.smith")).thenReturn(true);
 
-        var principal = (GymUserPrincipal) service.loadUserByUsername("john.smith");
+        var principal = service.loadUserByUsername("john.smith");
 
         assertThat(principal.getUsername()).isEqualTo("john.smith");
         assertThat(principal.getPassword()).isEqualTo("encoded");
@@ -51,16 +50,9 @@ class GymUserDetailsServiceTest {
     @Test
     void loadUserByUsernameRejectsUsersWithoutProfiles() {
         User user = new User("Ghost", "User", "ghost.user", "encoded", true);
-        when(userRepository.findByUsername("ghost.user")).thenReturn(Optional.of(user));
-        when(traineeRepository.findByUsername("ghost.user")).thenReturn(Optional.empty());
-        when(trainerRepository.findByUsername("ghost.user")).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameIgnoreCase("ghost.user")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.loadUserByUsername("ghost.user"))
                 .isInstanceOf(UsernameNotFoundException.class);
-    }
-
-    private com.example.gymcrm.domain.Trainee mockTrainee() {
-        return new com.example.gymcrm.domain.Trainee(
-                new User("John", "Smith", "john.smith", "encoded", true), null, null);
     }
 }

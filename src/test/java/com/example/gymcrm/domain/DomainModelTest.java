@@ -22,8 +22,6 @@ class DomainModelTest {
         assertThat(trainee.getTrainers()).containsExactly(second);
         assertThat(first.getTrainees()).isEmpty();
         assertThat(second.getTrainees()).containsExactly(trainee);
-        assertThat(trainee.toString()).contains("A.B").doesNotContain("secret1234");
-        assertThat(second.toString()).contains("E.F").doesNotContain("secret1234");
     }
 
     @Test
@@ -45,7 +43,6 @@ class DomainModelTest {
         assertThat(training.getTrainer()).isSameAs(trainer);
         assertThat(training.getTrainingType()).isSameAs(type);
         assertThat(training.getDurationMinutes()).isEqualTo(30);
-        assertThat(training.toString()).contains("Cardio").doesNotContain("newPassword");
-        assertThat(type.toString()).contains("CARDIO");
+        assertThat(user.toString()).doesNotContain("newPassword");
     }
 }

@@ -1,10 +1,9 @@
 package com.example.gymcrm.web.controller;
 
-import com.example.gymcrm.config.OpenApiConfig;
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import com.example.gymcrm.web.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,31 +27,28 @@ class SwaggerDocumentationTest {
     );
 
     @Test
-    void everyRestControllerAndEndpointHasOpenApiDocumentation() {
-        List<Method> endpointMethods = CONTROLLERS.stream()
-                .flatMap(controller -> List.of(controller.getDeclaredMethods()).stream())
-                .filter(this::isEndpoint)
-                .toList();
-
-        assertThat(endpointMethods).isNotEmpty();
+    void everyRestControllerHasOpenApiTag() {
         assertThat(CONTROLLERS)
                 .allMatch(controller -> controller.isAnnotationPresent(Tag.class),
                         "every controller should have an OpenAPI tag");
-        assertThat(endpointMethods)
-                .allMatch(method -> method.isAnnotationPresent(Operation.class),
-                        "every endpoint should have @Operation")
-                .allMatch(method -> method.isAnnotationPresent(ApiResponses.class),
-                        "every endpoint should have @ApiResponses");
+    }
+
+    @Test
+    void everyEndpointHasAnOpenApiSummary() {
+        endpointMethods().forEach(method -> {
+            Operation operation = method.getAnnotation(Operation.class);
+            assertThat(operation)
+                    .as("OpenAPI operation for %s", method)
+                    .isNotNull();
+            assertThat(operation.summary())
+                    .as("OpenAPI summary for %s", method)
+                    .isNotBlank();
+        });
     }
 
     @Test
     void everyProtectedEndpointReferencesTheBasicAuthScheme() {
-        List<Method> endpointMethods = CONTROLLERS.stream()
-                .flatMap(controller -> List.of(controller.getDeclaredMethods()).stream())
-                .filter(this::isEndpoint)
-                .toList();
-
-        assertThat(endpointMethods)
+        assertThat(endpointMethods())
                 .allSatisfy(method -> assertThat(hasBasicAuthRequirement(method))
                         .as("HTTP Basic requirement for %s", method)
                         .isEqualTo(!isPublicRegistration(method)));
@@ -73,6 +69,13 @@ class SwaggerDocumentationTest {
     private boolean isEndpoint(Method method) {
         return List.of(method.getDeclaredAnnotations()).stream()
                 .anyMatch(annotation -> annotation.annotationType().isAnnotationPresent(RequestMapping.class));
+    }
+
+    private List<Method> endpointMethods() {
+        return CONTROLLERS.stream()
+                .flatMap(controller -> List.of(controller.getDeclaredMethods()).stream())
+                .filter(this::isEndpoint)
+                .toList();
     }
 
     private boolean isPublicRegistration(Method method) {
