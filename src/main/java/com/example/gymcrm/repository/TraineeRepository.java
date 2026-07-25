@@ -1,0 +1,11 @@
+package com.example.gymcrm.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.example.gymcrm.domain.Trainee;
+
+public interface TraineeRepository extends JpaRepository<Trainee, Long> {
+    Optional<Trainee> findByUserUsernameIgnoreCase(String username);
+}

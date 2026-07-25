@@ -30,7 +30,7 @@ public class Trainee {
 
     @ManyToMany
     private Set<Trainer> trainers;
-    
+
     @OneToOne(optional = false)
     @JoinColumn(nullable = false, unique = true)
     private User user;
