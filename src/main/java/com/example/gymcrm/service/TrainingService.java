@@ -11,8 +11,6 @@ import com.example.gymcrm.repository.TrainingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;

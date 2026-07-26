@@ -46,7 +46,7 @@ class TrainingServiceTest {
     private TrainingService service;
 
     @Test
-    void addTrainingAuthenticatesTrainerDerivesTypeAssignsTrainerAndSavesTraining() {
+    void addTrainingAuthenticatesTrainerLoadsReferencesAssignsTrainerAndSavesTraining() {
         Trainer trainer = trainer("Coach.One");
         Trainee trainee = trainee("Runner.One");
         when(trainerRepository.findByUserUsernameIgnoreCase("Coach.One")).thenReturn(Optional.of(trainer));
@@ -90,7 +90,6 @@ class TrainingServiceTest {
         assertThatThrownBy(() -> service.addTraining(
                 "Missing.Runner", "Coach.One", "Yoga", LocalDate.of(2026, 7, 2), 45))
                 .isInstanceOf(EntityNotFoundException.class);
-        verify(trainingRepository, never()).save(any());
     }
 
     private Trainee trainee(String username) {

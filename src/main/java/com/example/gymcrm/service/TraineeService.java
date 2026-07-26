@@ -6,6 +6,7 @@ import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
+import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
