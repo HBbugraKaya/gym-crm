@@ -12,92 +12,64 @@ import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
-import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class TrainerService {
-    private static final Logger LOGGER = LoggerFactory.getLogger(TrainerService.class);
-
     private final TrainerRepository trainerRepository;
     private final TrainingTypeRepository trainingTypeRepository;
     private final TrainingRepository trainingRepository;
     private final UniqueUsernameGenerator usernameGenerator;
     private final SecurePasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
-    private final CurrentUser currentUser;
     private final GymCrmMetrics metrics;
 
-    public TrainerService(TrainerRepository trainerRepository,
-                          TrainingTypeRepository trainingTypeRepository,
-                          TrainingRepository trainingRepository,
-                          UniqueUsernameGenerator usernameGenerator,
-                          SecurePasswordGenerator passwordGenerator,
-                          PasswordEncoder passwordEncoder,
-                          CurrentUser currentUser,
-                          GymCrmMetrics metrics) {
-        this.trainerRepository = trainerRepository;
-        this.trainingTypeRepository = trainingTypeRepository;
-        this.trainingRepository = trainingRepository;
-        this.usernameGenerator = usernameGenerator;
-        this.passwordGenerator = passwordGenerator;
-        this.passwordEncoder = passwordEncoder;
-        this.currentUser = currentUser;
-        this.metrics = metrics;
-    }
-
     @Transactional
-    public CreatedAccount<Trainer> create(String firstName, String lastName, TrainingTypeName specialization) {
-        TrainingType trainingType = findTrainingType(specialization);
+    public CreatedAccount<Trainer> create(
+            String firstName, String lastName, TrainingTypeName specializationName) {
+        TrainingType specialization = findTrainingType(specializationName);
         String username = usernameGenerator.generate(firstName, lastName);
         String rawPassword = passwordGenerator.generate();
 
         Trainer trainer = new Trainer(
                 new User(firstName, lastName, username, passwordEncoder.encode(rawPassword), true),
-                trainingType);
+                specialization);
         Trainer saved = trainerRepository.save(trainer);
         metrics.recordTrainerRegistration();
-        LOGGER.info("Created trainer id={} username={} specialization={}",
-                saved.getId(), saved.getUsername(), trainingType.getName());
         return new CreatedAccount<>(saved, rawPassword);
     }
 
-    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('TRAINER') and #username.equalsIgnoreCase(authentication.name)")
     public Trainer findByUsername(String username) {
-        Trainer authenticated = currentUser.requireTrainer();
-        requireSameUser(authenticated.getUsername(), username);
-        Trainer trainer = trainerRepository.findByUsernameWithTrainees(authenticated.getUsername())
-                .orElseThrow(() -> new EntityNotFoundException("Trainer", username));
-        LOGGER.debug("Selected trainer profile username={}", trainer.getUsername());
-        return trainer;
+        return find(username);
     }
 
     @Transactional
+    @PreAuthorize("hasRole('TRAINER') and #username.equalsIgnoreCase(authentication.name)")
     public Trainer update(String username, String firstName, String lastName, boolean active) {
-        Trainer authenticated = currentUser.requireTrainer();
-        requireSameUser(authenticated.getUsername(), username);
-        Trainer trainer = trainerRepository.findByUsernameWithTrainees(authenticated.getUsername())
-                .orElseThrow(() -> new EntityNotFoundException("Trainer", username));
+        Trainer trainer = find(username);
         trainer.updateProfile(firstName, lastName, active);
-        LOGGER.info("Updated trainer id={} username={} specialization={}",
-                trainer.getId(), trainer.getUsername(), trainer.getSpecialization().getName());
         return trainer;
     }
 
-    @Transactional(readOnly = true)
-    public List<Training> getTrainings(String trainerUsername, TrainerTrainingCriteria criteria) {
-        Trainer trainer = currentUser.requireTrainer();
-        requireSameUser(trainer.getUsername(), trainerUsername);
-        List<Training> trainings = trainingRepository.findByTrainerUsername(trainerUsername, criteria);
-        LOGGER.debug("Loaded trainer trainings username={} count={}", trainerUsername, trainings.size());
-        return trainings;
+    @PreAuthorize("hasRole('TRAINER') and #trainerUsername.equalsIgnoreCase(authentication.name)")
+    public List<Training> getTrainings(
+            String trainerUsername, LocalDate fromDate, LocalDate toDate, String traineeName) {
+        validatePeriod(fromDate, toDate);
+        return trainingRepository.findByTrainerUserUsernameIgnoreCase(trainerUsername).stream()
+                .filter(training -> fromDate == null || !training.getDate().isBefore(fromDate))
+                .filter(training -> toDate == null || !training.getDate().isAfter(toDate))
+                .filter(training -> matchesName(
+                        traineeName, training.getTrainee().getFirstName(), training.getTrainee().getLastName()))
+                .toList();
     }
 
     private TrainingType findTrainingType(TrainingTypeName name) {
@@ -105,8 +77,21 @@ public class TrainerService {
                 .orElseThrow(() -> new EntityNotFoundException("TrainingType", name.name()));
     }
 
-    private void requireSameUser(String authenticatedUsername, String requestedUsername) {
-        SelfAccess.require(authenticatedUsername, requestedUsername,
-                "Authenticated trainer can only access own profile");
+    private Trainer find(String username) {
+        return trainerRepository.findByUserUsernameIgnoreCase(username)
+                .orElseThrow(() -> new EntityNotFoundException("Trainer", username));
+    }
+
+    private void validatePeriod(LocalDate fromDate, LocalDate toDate) {
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new ValidationException("periodFrom must be on or before periodTo");
+        }
+    }
+
+    private boolean matchesName(String query, String firstName, String lastName) {
+        if (query == null || query.isBlank()) {
+            return true;
+        }
+        return (firstName + " " + lastName).toLowerCase().contains(query.trim().toLowerCase());
     }
 }

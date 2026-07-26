@@ -1,4 +1,4 @@
-package com.example.gymcrm.config;
+package com.example.gymcrm.web;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;

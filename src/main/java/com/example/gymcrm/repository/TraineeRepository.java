@@ -8,19 +8,8 @@ import java.util.Optional;
 
 public interface TraineeRepository extends JpaRepository<Trainee, Long> {
 
+    @EntityGraph(attributePaths = {"user", "trainers.user", "trainers.specialization"})
     Optional<Trainee> findByUserUsernameIgnoreCase(String username);
 
-    /**
-     * Loads trainers graph in one query. {@code Distinct} avoids duplicate roots when joining the collection.
-     */
-    @EntityGraph(attributePaths = {"trainers", "trainers.user", "trainers.specialization"})
-    Optional<Trainee> findDistinctByUserUsernameIgnoreCase(String username);
-
-    default Optional<Trainee> findByUsername(String username) {
-        return findByUserUsernameIgnoreCase(UsernameNormalizer.trim(username));
-    }
-
-    default Optional<Trainee> findByUsernameWithTrainers(String username) {
-        return findDistinctByUserUsernameIgnoreCase(UsernameNormalizer.trim(username));
-    }
+    boolean existsByUserUsernameIgnoreCase(String username);
 }

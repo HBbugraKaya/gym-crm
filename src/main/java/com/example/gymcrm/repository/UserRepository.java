@@ -11,19 +11,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByUsernameIgnoreCase(String username);
 
-    long countByFirstNameIgnoreCaseAndLastNameIgnoreCase(String firstName, String lastName);
-
-    default Optional<User> findByUsername(String username) {
-        return findByUsernameIgnoreCase(UsernameNormalizer.trim(username));
-    }
-
-    default boolean existsByUsername(String username) {
-        return existsByUsernameIgnoreCase(UsernameNormalizer.trim(username));
-    }
-
-    default long countByFirstNameAndLastName(String firstName, String lastName) {
-        return countByFirstNameIgnoreCaseAndLastNameIgnoreCase(
-                UsernameNormalizer.trim(firstName),
-                UsernameNormalizer.trim(lastName));
-    }
 }

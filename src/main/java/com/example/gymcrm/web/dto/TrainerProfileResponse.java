@@ -12,7 +12,4 @@ public record TrainerProfileResponse(
         boolean active,
         List<TraineeSummaryResponse> trainees
 ) {
-    public TrainerProfileResponse {
-        trainees = List.copyOf(trainees);
-    }
 }

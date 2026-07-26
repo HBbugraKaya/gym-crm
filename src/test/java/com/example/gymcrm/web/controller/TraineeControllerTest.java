@@ -6,7 +6,6 @@ import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.service.TraineeService;
 import com.example.gymcrm.service.CreatedAccount;
-import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TraineeProfileResponse;
 import com.example.gymcrm.web.dto.TraineeRegistrationRequest;
@@ -80,7 +79,8 @@ class TraineeControllerTest {
         Trainee updated = mock(Trainee.class);
         var expected = new TraineeProfileResponse(
                 USERNAME, "Johnny", "Smith", birthDate, "Ankara", false, List.of());
-        when(traineeService.update(USERNAME, "Johnny", "Smith", birthDate, "Ankara", false)).thenReturn(updated);
+        when(traineeService.update(USERNAME, "Johnny", "Smith", birthDate, "Ankara", false))
+                .thenReturn(updated);
         when(mapper.toTraineeProfile(updated)).thenReturn(expected);
 
         var result = controller.updateProfile(USERNAME, request);
@@ -131,16 +131,16 @@ class TraineeControllerTest {
     void getTrainingsBuildsCriteriaAndMapsFilteredResult() {
         LocalDate from = LocalDate.of(2026, 1, 1);
         LocalDate to = LocalDate.of(2026, 12, 31);
-        var criteria = new TraineeTrainingCriteria(from, to, "Alice", TrainingTypeName.YOGA);
         List<Training> trainings = List.of(mock(Training.class));
         List<TraineeTrainingResponse> expected = List.of();
-        when(traineeService.getTrainings(USERNAME, criteria)).thenReturn(trainings);
+        when(traineeService.getTrainings(USERNAME, from, to, "Alice", TrainingTypeName.YOGA))
+                .thenReturn(trainings);
         when(mapper.toTraineeTrainings(trainings)).thenReturn(expected);
 
         var result = controller.getTrainings(USERNAME, from, to, "Alice", TrainingTypeName.YOGA);
 
         assertThat(result).isSameAs(expected);
-        verify(traineeService).getTrainings(USERNAME, criteria);
+        verify(traineeService).getTrainings(USERNAME, from, to, "Alice", TrainingTypeName.YOGA);
         verify(mapper).toTraineeTrainings(trainings);
     }
 }

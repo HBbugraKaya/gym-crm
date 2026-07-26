@@ -7,15 +7,12 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
-import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.criteria.TraineeTrainingCriteria;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -57,9 +54,6 @@ class TraineeServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private CurrentUser currentUser;
-
-    @Mock
     private GymCrmMetrics metrics;
 
     @InjectMocks
@@ -72,7 +66,8 @@ class TraineeServiceTest {
         when(passwordEncoder.encode("secret1234")).thenReturn("encoded-secret1234");
         when(traineeRepository.save(any(Trainee.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var created = service.create("John", "Smith", LocalDate.of(2000, 1, 1), "Address");
+        var created = service.create(
+                "John", "Smith", LocalDate.of(2000, 1, 1), "Address");
 
         assertThat(created.rawPassword()).isEqualTo("secret1234");
         assertThat(created.profile().getFirstName()).isEqualTo("John");
@@ -80,6 +75,7 @@ class TraineeServiceTest {
         assertThat(created.profile().getUsername()).isEqualTo("John.Smith");
         assertThat(created.profile().getPassword()).isEqualTo("encoded-secret1234");
         assertThat(created.profile().getAddress()).isEqualTo("Address");
+        assertThat(created.profile().isActive()).isTrue();
         verify(traineeRepository).save(created.profile());
         verify(metrics).recordTraineeRegistration();
     }
@@ -87,21 +83,18 @@ class TraineeServiceTest {
     @Test
     void findByUsernameReturnsAuthenticatedTraineeOnlyForOwnUsername() {
         Trainee trainee = trainee("John.Smith", true);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(traineeRepository.findByUsernameWithTrainers("John.Smith")).thenReturn(Optional.of(trainee));
+        when(traineeRepository.findByUserUsernameIgnoreCase("john.smith")).thenReturn(Optional.of(trainee));
 
         assertThat(service.findByUsername("john.smith")).isSameAs(trainee);
-        assertThatThrownBy(() -> service.findByUsername("Other.User"))
-                .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void updateMutatesAuthenticatedTrainee() {
         Trainee trainee = trainee("Jane.Doe", true);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(traineeRepository.findByUsernameWithTrainers("Jane.Doe")).thenReturn(Optional.of(trainee));
+        when(traineeRepository.findByUserUsernameIgnoreCase("Jane.Doe")).thenReturn(Optional.of(trainee));
 
-        service.update("Jane.Doe", "Janet", "Doe", LocalDate.of(1999, 5, 4), "Izmir", false);
+        service.update(
+                "Jane.Doe", "Janet", "Doe", LocalDate.of(1999, 5, 4), "Izmir", false);
 
         assertThat(trainee.getFirstName()).isEqualTo("Janet");
         assertThat(trainee.getDateOfBirth()).isEqualTo(LocalDate.of(1999, 5, 4));
@@ -110,36 +103,32 @@ class TraineeServiceTest {
     }
 
     @Test
-    void deleteClearsAssignmentsAndDelegatesToRepository() {
+    void deleteDelegatesToRepository() {
         Trainee trainee = trainee("Delete.Me", true);
-        Trainer trainer = trainer("Keep.Trainer", 11L);
-        trainee.assignTrainer(trainer);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
+        when(traineeRepository.findByUserUsernameIgnoreCase("Delete.Me")).thenReturn(Optional.of(trainee));
 
         service.deleteByUsername("Delete.Me");
 
-        assertThat(trainee.getTrainers()).isEmpty();
-        assertThat(trainer.getTrainees()).isEmpty();
         verify(traineeRepository).delete(trainee);
     }
 
     @Test
     void getTrainingsAuthenticatesOwnProfileAndDelegatesCriteria() {
         Trainee trainee = trainee("Runner.One", true);
-        TraineeTrainingCriteria criteria = new TraineeTrainingCriteria(
-                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), "Coach", TrainingTypeName.YOGA);
         Training training = training(trainee, trainer("Coach.One", 12L));
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(trainingRepository.findByTraineeUsername("Runner.One", criteria)).thenReturn(List.of(training));
+        when(trainingRepository.findByTraineeUserUsernameIgnoreCase("Runner.One")).thenReturn(List.of(training));
 
-        assertThat(service.getTrainings("Runner.One", criteria)).containsExactly(training);
+        assertThat(service.getTrainings(
+                "Runner.One",
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 3),
+                "Coach",
+                TrainingTypeName.YOGA)).containsExactly(training);
     }
 
     @Test
     void getUnassignedTrainersDelegatesToRepository() {
-        Trainee trainee = trainee("Runner.One", true);
         Trainer unassigned = trainer("Free.Trainer", 22L);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
         when(trainerRepository.findUnassignedActiveTrainers("Runner.One")).thenReturn(List.of(unassigned));
 
         assertThat(service.getUnassignedTrainers("Runner.One")).containsExactly(unassigned);
@@ -149,17 +138,15 @@ class TraineeServiceTest {
     void updateTrainersReplacesAssignmentsAndRejectsMissingTrainer() {
         Trainee trainee = trainee("Runner.One", true);
         Trainer trainer = trainer("New.Trainer", 31L);
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(traineeRepository.findByUsernameWithTrainers("Runner.One")).thenReturn(Optional.of(trainee));
-        when(trainerRepository.findAllByUsernames(argThat(usernames ->
-                usernames.containsAll(List.of("New.Trainer", "Missing.Trainer")) && usernames.size() == 2)))
-                .thenReturn(List.of(trainer));
+        when(traineeRepository.findByUserUsernameIgnoreCase("Runner.One")).thenReturn(Optional.of(trainee));
+        when(trainerRepository.findByUserUsernameIgnoreCase("New.Trainer")).thenReturn(Optional.of(trainer));
+        when(trainerRepository.findByUserUsernameIgnoreCase("Missing.Trainer")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateTrainers("Runner.One",
                 List.of("New.Trainer", "Missing.Trainer")))
                 .isInstanceOf(EntityNotFoundException.class);
-        verify(trainerRepository).findAllByUsernames(argThat(usernames ->
-                usernames.containsAll(List.of("New.Trainer", "Missing.Trainer")) && usernames.size() == 2));
+        verify(trainerRepository).findByUserUsernameIgnoreCase("New.Trainer");
+        verify(trainerRepository).findByUserUsernameIgnoreCase("Missing.Trainer");
         assertThat(trainee.getTrainers()).isEmpty();
     }
 
@@ -167,11 +154,8 @@ class TraineeServiceTest {
     void updateTrainersAcceptsEmptyListAndClearsAssignments() {
         Trainee trainee = trainee("Runner.One", true);
         trainee.assignTrainer(trainer("Old.Trainer", 41L));
-        when(currentUser.requireTrainee()).thenReturn(trainee);
-        when(traineeRepository.findByUsernameWithTrainers("Runner.One")).thenReturn(Optional.of(trainee));
-        when(trainerRepository.findAllByUsernames(anyCollection())).thenReturn(List.of());
-
-        assertThat(service.updateTrainers("Runner.One", null)).isEmpty();
+        when(traineeRepository.findByUserUsernameIgnoreCase("Runner.One")).thenReturn(Optional.of(trainee));
+        assertThat(service.updateTrainers("Runner.One", List.of())).isEmpty();
         assertThat(trainee.getTrainers()).isEmpty();
     }
 

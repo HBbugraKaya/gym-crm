@@ -1,7 +1,7 @@
 package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.domain.TrainingType;
-import com.example.gymcrm.service.TrainingTypeService;
+import com.example.gymcrm.repository.TrainingTypeRepository;
 import com.example.gymcrm.web.dto.TrainingTypeResponse;
 import com.example.gymcrm.web.mapper.GymWebMapper;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TrainingTypeControllerTest {
     @Mock
-    private TrainingTypeService trainingTypeService;
+    private TrainingTypeRepository trainingTypeRepository;
     @Mock
     private GymWebMapper mapper;
     @InjectMocks
@@ -29,13 +29,13 @@ class TrainingTypeControllerTest {
     void getTrainingTypesReadsCatalogAndMapsEntities() {
         List<TrainingType> entities = List.of();
         List<TrainingTypeResponse> expected = List.of();
-        when(trainingTypeService.findAll()).thenReturn(entities);
+        when(trainingTypeRepository.findAll()).thenReturn(entities);
         when(mapper.toTrainingTypes(entities)).thenReturn(expected);
 
         var result = controller.getTrainingTypes();
 
         assertThat(result).isSameAs(expected);
-        verify(trainingTypeService).findAll();
+        verify(trainingTypeRepository).findAll();
         verify(mapper).toTrainingTypes(entities);
     }
 }

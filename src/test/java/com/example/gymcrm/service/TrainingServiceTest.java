@@ -7,11 +7,10 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
+import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
-import com.example.gymcrm.security.CurrentUser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -38,7 +37,7 @@ class TrainingServiceTest {
     private TraineeRepository traineeRepository;
 
     @Mock
-    private CurrentUser currentUser;
+    private TrainerRepository trainerRepository;
 
     @Mock
     private GymCrmMetrics metrics;
@@ -50,8 +49,8 @@ class TrainingServiceTest {
     void addTrainingAuthenticatesTrainerDerivesTypeAssignsTrainerAndSavesTraining() {
         Trainer trainer = trainer("Coach.One");
         Trainee trainee = trainee("Runner.One");
-        when(currentUser.requireTrainer()).thenReturn(trainer);
-        when(traineeRepository.findByUsername("Runner.One")).thenReturn(Optional.of(trainee));
+        when(trainerRepository.findByUserUsernameIgnoreCase("Coach.One")).thenReturn(Optional.of(trainer));
+        when(traineeRepository.findByUserUsernameIgnoreCase("Runner.One")).thenReturn(Optional.of(trainee));
         when(trainingRepository.save(any(Training.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Training saved = service.addTraining(
@@ -72,22 +71,21 @@ class TrainingServiceTest {
     }
 
     @Test
-    void addTrainingRejectsTrainerUsernameMismatchBeforeRepositoryLookup() {
-        Trainer trainer = trainer("Coach.One");
-        when(currentUser.requireTrainer()).thenReturn(trainer);
+    void addTrainingRejectsMissingTrainerBeforeTraineeLookup() {
+        when(trainerRepository.findByUserUsernameIgnoreCase("Other.Coach")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.addTraining(
                 "Runner.One", "Other.Coach", "Yoga", LocalDate.of(2026, 7, 2), 45))
-                .isInstanceOf(ValidationException.class);
-        verify(traineeRepository, never()).findByUsername(any());
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(traineeRepository, never()).findByUserUsernameIgnoreCase(any());
         verify(trainingRepository, never()).save(any());
     }
 
     @Test
     void addTrainingRejectsMissingTrainee() {
         Trainer trainer = trainer("Coach.One");
-        when(currentUser.requireTrainer()).thenReturn(trainer);
-        when(traineeRepository.findByUsername("Missing.Runner")).thenReturn(Optional.empty());
+        when(trainerRepository.findByUserUsernameIgnoreCase("Coach.One")).thenReturn(Optional.of(trainer));
+        when(traineeRepository.findByUserUsernameIgnoreCase("Missing.Runner")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.addTraining(
                 "Missing.Runner", "Coach.One", "Yoga", LocalDate.of(2026, 7, 2), 45))

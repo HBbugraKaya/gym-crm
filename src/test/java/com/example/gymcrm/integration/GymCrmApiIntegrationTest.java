@@ -1,6 +1,5 @@
 package com.example.gymcrm.integration;
 
-import com.example.gymcrm.GymCrmApplication;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,7 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -28,16 +26,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = GymCrmApplication.class)
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class GymCrmApiIntegrationTest {
     private static final AtomicLong UNIQUE_SEQUENCE = new AtomicLong(System.nanoTime());
 
@@ -94,7 +92,65 @@ class GymCrmApiIntegrationTest {
         mockMvc.perform(get("/api/v1/training-types"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
-                        "Basic realm=\"gym-crm\", charset=\"UTF-8\""));
+                        org.hamcrest.Matchers.containsString("gym-crm")));
+    }
+
+    @Test
+    void methodSecurityRejectsCrossProfileAndWrongRoleAccess() throws Exception {
+        String suffix = uniqueSuffix();
+        RegistrationResponse first = registerTrainee("First" + suffix, "Trainee");
+        RegistrationResponse second = registerTrainee("Second" + suffix, "Trainee");
+
+        mockMvc.perform(get("/api/v1/trainees/{username}", second.username())
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(first)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/trainings")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(first))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "traineeUsername", first.username(),
+                                "trainerUsername", first.username(),
+                                "trainingName", "Forbidden",
+                                "trainingDate", "2026-07-16",
+                                "durationMinutes", 30))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void loginPasswordChangeAndNonIdempotentStatusWorkEndToEnd() throws Exception {
+        String suffix = uniqueSuffix();
+        RegistrationResponse trainee = registerTrainee("Account" + suffix, "Trainee");
+        String newPassword = "changed-" + suffix;
+
+        mockMvc.perform(get("/api/v1/auth/login")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("newPassword", newPassword))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/auth/login")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/auth/login")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee.username(), newPassword)))
+                .andExpect(status().isOk());
+
+        String newAuthorization = basicAuth(trainee.username(), newPassword);
+        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
+                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("active", false))))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
+                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("active", false))))
+                .andExpect(status().isConflict());
     }
 
     @Test

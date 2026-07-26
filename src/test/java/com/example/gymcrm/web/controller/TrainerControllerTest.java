@@ -5,7 +5,6 @@ import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.service.TrainerService;
 import com.example.gymcrm.service.CreatedAccount;
-import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TrainerProfileResponse;
 import com.example.gymcrm.web.dto.TrainerRegistrationRequest;
@@ -88,16 +87,15 @@ class TrainerControllerTest {
     void getTrainingsBuildsCriteriaAndMapsFilteredResult() {
         LocalDate from = LocalDate.of(2026, 1, 1);
         LocalDate to = LocalDate.of(2026, 12, 31);
-        var criteria = new TrainerTrainingCriteria(from, to, "John");
         List<Training> trainings = List.of(mock(Training.class));
         List<TrainerTrainingResponse> expected = List.of();
-        when(trainerService.getTrainings(USERNAME, criteria)).thenReturn(trainings);
+        when(trainerService.getTrainings(USERNAME, from, to, "John")).thenReturn(trainings);
         when(mapper.toTrainerTrainings(trainings)).thenReturn(expected);
 
         var result = controller.getTrainings(USERNAME, from, to, "John");
 
         assertThat(result).isSameAs(expected);
-        verify(trainerService).getTrainings(USERNAME, criteria);
+        verify(trainerService).getTrainings(USERNAME, from, to, "John");
         verify(mapper).toTrainerTrainings(trainings);
     }
 }
