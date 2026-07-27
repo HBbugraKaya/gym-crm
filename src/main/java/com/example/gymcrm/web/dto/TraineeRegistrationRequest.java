@@ -1,5 +1,7 @@
 package com.example.gymcrm.web.dto;
 
-public class TraineeRegistrationRequest {
-    
+import java.time.LocalDate;
+
+public record TraineeRegistrationRequest(String firstName, String lastName, LocalDate dateOfBirth, String address) {
+
 }
