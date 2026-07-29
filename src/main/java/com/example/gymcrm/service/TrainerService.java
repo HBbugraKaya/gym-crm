@@ -65,12 +65,8 @@ public class TrainerService {
     public List<Training> getTrainings(
             String trainerUsername, LocalDate fromDate, LocalDate toDate, String traineeName) {
         validatePeriod(fromDate, toDate);
-        return trainingRepository.findByTrainerUserUsernameIgnoreCase(trainerUsername).stream()
-                .filter(training -> fromDate == null || !training.getDate().isBefore(fromDate))
-                .filter(training -> toDate == null || !training.getDate().isAfter(toDate))
-                .filter(training -> matchesName(
-                        traineeName, training.getTrainee().getFirstName(), training.getTrainee().getLastName()))
-                .toList();
+        return trainingRepository.findTrainerTrainings(
+                trainerUsername, fromDate, toDate, normalizeName(traineeName));
     }
 
     private TrainingType findTrainingType(TrainingTypeName name) {
@@ -89,10 +85,7 @@ public class TrainerService {
         }
     }
 
-    private boolean matchesName(String query, String firstName, String lastName) {
-        if (query == null || query.isBlank()) {
-            return true;
-        }
-        return (firstName + " " + lastName).toLowerCase().contains(query.trim().toLowerCase());
+    private String normalizeName(String name) {
+        return name == null || name.isBlank() ? null : name.trim();
     }
 }

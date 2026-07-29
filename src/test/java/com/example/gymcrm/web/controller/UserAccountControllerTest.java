@@ -2,7 +2,6 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.service.UserAccountService;
 import com.example.gymcrm.web.dto.ChangePasswordRequest;
-import com.example.gymcrm.web.dto.ChangeStatusRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,17 +23,9 @@ class UserAccountControllerTest {
 
     @Test
     void changePasswordDelegatesToCommonUserService() {
-        var response = controller.changePassword(USERNAME, new ChangePasswordRequest("new-secret"));
+        var response = controller.changePassword(USERNAME, new ChangePasswordRequest("old-secret", "new-secret"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(userAccountService).changePassword(USERNAME, "new-secret");
-    }
-
-    @Test
-    void changeStatusDelegatesToCommonUserService() {
-        var response = controller.changeStatus(USERNAME, new ChangeStatusRequest(false));
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(userAccountService).changeStatus(USERNAME, false);
+        verify(userAccountService).changePassword(USERNAME, "old-secret", "new-secret");
     }
 }

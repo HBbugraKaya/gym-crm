@@ -19,8 +19,11 @@ public class UserAccountService {
 
     @Transactional
     @PreAuthorize("#targetUsername.equalsIgnoreCase(authentication.name)")
-    public void changePassword(String targetUsername, String newPassword) {
+    public void changePassword(String targetUsername, String oldPassword, String newPassword) {
         User user = find(targetUsername);
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Old password is incorrect");
+        }
         user.changePassword(passwordEncoder.encode(newPassword));
     }
 

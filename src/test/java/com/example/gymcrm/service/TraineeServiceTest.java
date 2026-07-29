@@ -116,7 +116,12 @@ class TraineeServiceTest {
     void getTrainingsAuthenticatesOwnProfileAndDelegatesCriteria() {
         Trainee trainee = trainee("Runner.One", true);
         Training training = training(trainee, trainer("Coach.One", 12L));
-        when(trainingRepository.findByTraineeUserUsernameIgnoreCase("Runner.One")).thenReturn(List.of(training));
+        when(trainingRepository.findTraineeTrainings(
+                "Runner.One",
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 3),
+                "Coach",
+                TrainingTypeName.YOGA)).thenReturn(List.of(training));
 
         assertThat(service.getTrainings(
                 "Runner.One",

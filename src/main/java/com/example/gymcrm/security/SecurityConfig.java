@@ -2,11 +2,14 @@ package com.example.gymcrm.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.example.gymcrm.web.error.ApiError;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -41,7 +44,9 @@ import java.util.List;
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
-            HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+            HttpSecurity http,
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            ObjectMapper objectMapper) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -54,6 +59,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) ->
+                                writeSecurityError(response, objectMapper, 401, "Authentication is required", request.getRequestURI()))
+                        .accessDeniedHandler((request, response, exception) ->
+                                writeSecurityError(response, objectMapper, 403, "Access is denied", request.getRequestURI())))
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
@@ -118,5 +128,17 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private void writeSecurityError(
+            jakarta.servlet.http.HttpServletResponse response,
+            ObjectMapper objectMapper,
+            int status,
+            String message,
+            String path) throws java.io.IOException {
+        response.setStatus(status);
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), ApiError.of(status, message, path));
     }
 }

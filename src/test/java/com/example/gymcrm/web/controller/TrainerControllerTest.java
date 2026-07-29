@@ -4,8 +4,10 @@ import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.service.TrainerService;
+import com.example.gymcrm.service.UserAccountService;
 import com.example.gymcrm.service.CreatedAccount;
 import com.example.gymcrm.web.dto.RegistrationResponse;
+import com.example.gymcrm.web.dto.ChangeStatusRequest;
 import com.example.gymcrm.web.dto.TrainerProfileResponse;
 import com.example.gymcrm.web.dto.TrainerRegistrationRequest;
 import com.example.gymcrm.web.dto.TrainerTrainingResponse;
@@ -32,6 +34,8 @@ class TrainerControllerTest {
 
     @Mock
     private TrainerService trainerService;
+    @Mock
+    private UserAccountService userAccountService;
     @Mock
     private GymWebMapper mapper;
     @InjectMocks
@@ -81,6 +85,14 @@ class TrainerControllerTest {
 
         assertThat(result).isSameAs(expected);
         verify(trainerService).update(USERNAME, "Alicia", "Coach", false);
+    }
+
+    @Test
+    void changeStatusDelegatesToTheAuthenticatedAccountService() {
+        var response = controller.changeStatus(USERNAME, new ChangeStatusRequest(false));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(userAccountService).changeStatus(USERNAME, false);
     }
 
     @Test

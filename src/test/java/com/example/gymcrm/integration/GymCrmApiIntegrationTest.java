@@ -91,7 +91,9 @@ class GymCrmApiIntegrationTest {
         mockMvc.perform(get("/api/v1/training-types"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
-                        org.hamcrest.Matchers.containsString("Bearer")));
+                        org.hamcrest.Matchers.containsString("Bearer")))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.transactionId").isNotEmpty());
 
         mockMvc.perform(options("/api/v1/auth/login")
                         .header(HttpHeaders.ORIGIN, "http://localhost:3000")
@@ -133,7 +135,15 @@ class GymCrmApiIntegrationTest {
         mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
                         .header(HttpHeaders.AUTHORIZATION, initialAuthorization)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("newPassword", newPassword))))
+                        .content(json(Map.of("oldPassword", "incorrect", "newPassword", newPassword))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Old password is incorrect"));
+
+        mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
+                        .header(HttpHeaders.AUTHORIZATION, initialAuthorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("oldPassword", trainee.password(), "newPassword", newPassword))))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -142,12 +152,12 @@ class GymCrmApiIntegrationTest {
                 .andExpect(status().isUnauthorized());
 
         String newAuthorization = bearerAuth(trainee.username(), newPassword);
-        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
+        mockMvc.perform(patch("/api/v1/trainees/{username}/status", trainee.username())
                         .header(HttpHeaders.AUTHORIZATION, newAuthorization)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("active", false))))
                 .andExpect(status().isOk());
-        mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
+        mockMvc.perform(patch("/api/v1/trainees/{username}/status", trainee.username())
                         .header(HttpHeaders.AUTHORIZATION, newAuthorization)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("active", false))))

@@ -2,8 +2,10 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.service.TraineeService;
+import com.example.gymcrm.service.UserAccountService;
 import com.example.gymcrm.web.OpenApiConfig;
 import com.example.gymcrm.web.dto.RegistrationResponse;
+import com.example.gymcrm.web.dto.ChangeStatusRequest;
 import com.example.gymcrm.web.dto.TraineeProfileResponse;
 import com.example.gymcrm.web.dto.TraineeRegistrationRequest;
 import com.example.gymcrm.web.dto.TraineeTrainingResponse;
@@ -21,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,6 +40,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TraineeController {
     private final TraineeService traineeService;
+    private final UserAccountService userAccountService;
     private final GymWebMapper mapper;
 
     @PostMapping
@@ -75,6 +79,16 @@ public class TraineeController {
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public ResponseEntity<Void> deleteProfile(@PathVariable String username) {
         traineeService.deleteByUsername(username);
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/{username}/status")
+    @Operation(summary = "Activate or deactivate a trainee")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
+    public ResponseEntity<Void> changeStatus(
+            @PathVariable String username,
+            @Valid @RequestBody ChangeStatusRequest request) {
+        userAccountService.changeStatus(username, request.active());
         return ResponseEntity.ok().build();
     }
 

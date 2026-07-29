@@ -78,13 +78,8 @@ public class TraineeService {
             String trainerName,
             TrainingTypeName trainingType) {
         validatePeriod(fromDate, toDate);
-        return trainingRepository.findByTraineeUserUsernameIgnoreCase(traineeUsername).stream()
-                .filter(training -> fromDate == null || !training.getDate().isBefore(fromDate))
-                .filter(training -> toDate == null || !training.getDate().isAfter(toDate))
-                .filter(training -> trainingType == null || training.getTrainingType().getName() == trainingType)
-                .filter(training -> matchesName(
-                        trainerName, training.getTrainer().getFirstName(), training.getTrainer().getLastName()))
-                .toList();
+        return trainingRepository.findTraineeTrainings(
+                traineeUsername, fromDate, toDate, normalizeName(trainerName), trainingType);
     }
 
     @PreAuthorize("hasRole('TRAINEE') and #traineeUsername.equalsIgnoreCase(authentication.name)")
@@ -116,11 +111,7 @@ public class TraineeService {
         }
     }
 
-    private boolean matchesName(String query, String firstName, String lastName) {
-        if (query == null || query.isBlank()) {
-            return true;
-        }
-        String name = (firstName + " " + lastName).toLowerCase();
-        return name.contains(query.trim().toLowerCase());
+    private String normalizeName(String name) {
+        return name == null || name.isBlank() ? null : name.trim();
     }
 }

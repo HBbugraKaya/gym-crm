@@ -34,20 +34,30 @@ class UserAccountServiceTest {
     void changePasswordEncodesAndMutatesOnlyAuthenticatedOwnAccount() {
         User user = user("Jane.Doe", "encoded-old", true);
         when(userRepository.findByUsernameIgnoreCase("jane.doe")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("oldPassword", "encoded-old")).thenReturn(true);
         when(passwordEncoder.encode("newPassword")).thenReturn("encoded-new");
 
-        service.changePassword("jane.doe", "newPassword");
+        service.changePassword("jane.doe", "oldPassword", "newPassword");
 
         assertThat(user.getPassword()).isEqualTo("encoded-new");
+        verify(passwordEncoder).matches("oldPassword", "encoded-old");
         verify(passwordEncoder).encode("newPassword");
     }
 
     @Test
-    void changePasswordRejectsMissingUserWithoutMutation() {
+    void changePasswordRejectsMissingUserOrIncorrectOldPasswordWithoutMutation() {
         User user = user("Jane.Doe", "encoded-old", true);
 
-        assertThatThrownBy(() -> service.changePassword("Other.User", "newPassword"))
+        assertThatThrownBy(() -> service.changePassword("Other.User", "oldPassword", "newPassword"))
                 .isInstanceOf(EntityNotFoundException.class);
+
+        when(userRepository.findByUsernameIgnoreCase("jane.doe")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrongPassword", "encoded-old")).thenReturn(false);
+        assertThatThrownBy(() -> service.changePassword("jane.doe", "wrongPassword", "newPassword"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                    assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(exception.getReason()).isEqualTo("Old password is incorrect");
+                });
         assertThat(user.getPassword()).isEqualTo("encoded-old");
     }
 

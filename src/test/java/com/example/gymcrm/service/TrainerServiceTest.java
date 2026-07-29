@@ -118,7 +118,11 @@ class TrainerServiceTest {
                 LocalDate.of(2000, 1, 1), "Address");
         Training training = new Training(trainee, trainer, "Yoga", trainer.getSpecialization(),
                 LocalDate.of(2026, 7, 2), 45);
-        when(trainingRepository.findByTrainerUserUsernameIgnoreCase("Coach.One")).thenReturn(List.of(training));
+        when(trainingRepository.findTrainerTrainings(
+                "Coach.One",
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 3),
+                "Runner")).thenReturn(List.of(training));
 
         assertThat(service.getTrainings(
                 "Coach.One", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), "Runner"))

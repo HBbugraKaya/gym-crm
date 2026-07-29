@@ -59,7 +59,7 @@ class DtoValidationTest {
         var training = new AddTrainingRequest("", " ", "", null, 0);
         var assignments = new TrainerAssignmentsRequest(List.of("valid.trainer", " "));
         var missingAssignments = new TrainerAssignmentsRequest(null);
-        var password = new ChangePasswordRequest(" ");
+        var password = new ChangePasswordRequest(" ", "");
         var status = new ChangeStatusRequest(null);
         var login = new LoginRequest(" ", "");
 
@@ -74,7 +74,7 @@ class DtoValidationTest {
                 .contains("trainerUsernames");
         assertThat(validator.validate(password))
                 .extracting(violation -> violation.getPropertyPath().toString())
-                .contains("newPassword");
+                .contains("oldPassword", "newPassword");
         assertThat(validator.validate(status))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .contains("active");
@@ -99,7 +99,7 @@ class DtoValidationTest {
         assertThat(validator.validate(
                 new AddTrainingRequest("john.smith", "alice.coach", "Yoga", trainingDate, 60))).isEmpty();
         assertThat(validator.validate(new TrainerAssignmentsRequest(List.of("alice.coach")))).isEmpty();
-        assertThat(validator.validate(new ChangePasswordRequest("new-secret"))).isEmpty();
+        assertThat(validator.validate(new ChangePasswordRequest("old-secret", "new-secret"))).isEmpty();
         assertThat(validator.validate(new ChangeStatusRequest(true))).isEmpty();
         assertThat(validator.validate(new LoginRequest("john.smith", "secret"))).isEmpty();
     }

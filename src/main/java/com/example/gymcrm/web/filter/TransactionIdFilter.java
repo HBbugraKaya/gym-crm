@@ -46,6 +46,8 @@ public final class TransactionIdFilter extends OncePerRequestFilter {
             logCompletion(
                     request.getMethod(),
                     request.getRequestURI(),
+                    request.getContentType(),
+                    request.getParameterMap().keySet().toString(),
                     status,
                     (System.nanoTime() - startedAt) / 1_000_000L,
                     failure);
@@ -53,21 +55,28 @@ public final class TransactionIdFilter extends OncePerRequestFilter {
         }
     }
 
-    private void logCompletion(String method, String path, int status, long durationMillis, Throwable failure) {
+    private void logCompletion(
+            String method,
+            String path,
+            String contentType,
+            String parameterNames,
+            int status,
+            long durationMillis,
+            Throwable failure) {
         HttpStatus httpStatus = HttpStatus.resolve(status);
         String responseMessage = httpStatus == null ? "HTTP Response" : httpStatus.getReasonPhrase();
 
         if (status >= 500) {
             String failureType = failure == null ? "none" : failure.getClass().getSimpleName();
             LOGGER.error(
-                    "REST call completed method={} path={} status={} response={} durationMs={} failureType={}",
-                    method, path, status, responseMessage, durationMillis, failureType);
+                    "REST call completed method={} path={} contentType={} parameterNames={} status={} response={} durationMs={} failureType={}",
+                    method, path, contentType, parameterNames, status, responseMessage, durationMillis, failureType);
         } else if (status >= 400) {
-            LOGGER.warn("REST call completed method={} path={} status={} response={} durationMs={}",
-                    method, path, status, responseMessage, durationMillis);
+            LOGGER.warn("REST call completed method={} path={} contentType={} parameterNames={} status={} response={} durationMs={}",
+                    method, path, contentType, parameterNames, status, responseMessage, durationMillis);
         } else {
-            LOGGER.info("REST call completed method={} path={} status={} response={} durationMs={}",
-                    method, path, status, responseMessage, durationMillis);
+            LOGGER.info("REST call completed method={} path={} contentType={} parameterNames={} status={} response={} durationMs={}",
+                    method, path, contentType, parameterNames, status, responseMessage, durationMillis);
         }
     }
 

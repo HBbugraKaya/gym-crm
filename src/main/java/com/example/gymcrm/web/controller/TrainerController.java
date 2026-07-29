@@ -1,8 +1,10 @@
 package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.service.TrainerService;
+import com.example.gymcrm.service.UserAccountService;
 import com.example.gymcrm.web.OpenApiConfig;
 import com.example.gymcrm.web.dto.RegistrationResponse;
+import com.example.gymcrm.web.dto.ChangeStatusRequest;
 import com.example.gymcrm.web.dto.TrainerProfileResponse;
 import com.example.gymcrm.web.dto.TrainerRegistrationRequest;
 import com.example.gymcrm.web.dto.TrainerTrainingResponse;
@@ -17,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +36,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TrainerController {
     private final TrainerService trainerService;
+    private final UserAccountService userAccountService;
     private final GymWebMapper mapper;
 
     @PostMapping
@@ -58,6 +62,16 @@ public class TrainerController {
             @Valid @RequestBody UpdateTrainerRequest request) {
         var updated = trainerService.update(username, request.firstName(), request.lastName(), request.active());
         return mapper.toTrainerProfile(updated);
+    }
+
+    @PatchMapping("/{username}/status")
+    @Operation(summary = "Activate or deactivate a trainer")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
+    public ResponseEntity<Void> changeStatus(
+            @PathVariable String username,
+            @Valid @RequestBody ChangeStatusRequest request) {
+        userAccountService.changeStatus(username, request.active());
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{username}/trainings")

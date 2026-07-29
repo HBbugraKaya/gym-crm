@@ -80,7 +80,7 @@ least 32 characters outside the `local` profile. Browser clients are allowed onl
 
 Actuator endpoints (`/actuator/**`) are public operational endpoints and do not require gym credentials.
 HTTP and validation errors use Spring Boot's standard responses. Unauthorized requests include
-`WWW-Authenticate: Basic realm="gym-crm"`.
+`WWW-Authenticate: Bearer`.
 
 ## OpenAPI and Swagger UI
 
@@ -117,8 +117,9 @@ when the related service operation succeeds.
 ## Logging
 
 Every request receives or reuses a canonical `X-Transaction-Id`, which is propagated through MDC and returned in
-the response. Logs include method, path, status and duration. Authorization values, passwords, bodies, addresses
-and dates of birth are never logged. Application logging is `DEBUG` in local/dev and `INFO` in stg/prod.
+the response. Logs include method, path, content type, request parameter names, status and duration. Authorization
+values, passwords, request bodies, addresses and dates of birth are never logged. Application logging is `DEBUG` in
+local/dev and `INFO` in stg/prod.
 
 ## Tests
 

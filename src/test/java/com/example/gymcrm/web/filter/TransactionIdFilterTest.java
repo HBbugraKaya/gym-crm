@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.util.UUID;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -89,6 +90,8 @@ class TransactionIdFilterTest {
             assertThat(event.getLevel()).isEqualTo(Level.ERROR);
             assertThat(event.getFormattedMessage())
                     .contains(
+                            "contentType=null",
+                            "parameterNames=[]",
                             "status=500",
                             "response=Internal Server Error",
                             "failureType=ServletException");
@@ -123,6 +126,7 @@ class TransactionIdFilterTest {
         when(request.getHeader(TransactionIdFilter.TRANSACTION_ID_HEADER)).thenReturn(transactionId);
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/api/v1/trainees/John.Smith");
+        when(request.getParameterMap()).thenReturn(Map.of());
         return request;
     }
 
