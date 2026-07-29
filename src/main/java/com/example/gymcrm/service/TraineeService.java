@@ -10,11 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.gymcrm.domain.Trainee;
-import com.example.gymcrm.domain.Trainer;
-import com.example.gymcrm.domain.Training;
-import com.example.gymcrm.domain.TrainingTypeName;
-import com.example.gymcrm.domain.User;
+import com.example.gymcrm.entity.Trainee;
+import com.example.gymcrm.entity.Trainer;
+import com.example.gymcrm.entity.Training;
+import com.example.gymcrm.entity.TrainingTypeName;
+import com.example.gymcrm.entity.User;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.UserRepository;
 import com.example.gymcrm.repository.TrainerRepository;

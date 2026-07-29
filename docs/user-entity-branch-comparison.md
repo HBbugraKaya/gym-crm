@@ -3,7 +3,7 @@
 ## `refactor` branch
 
 ```java
-package com.example.gymcrm.domain;
+package com.example.gymcrm.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -98,7 +98,7 @@ public class User {
 ## `training` branch
 
 ```java
-package com.example.gymcrm.domain;
+package com.example.gymcrm.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

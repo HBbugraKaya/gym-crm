@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.example.gymcrm.domain.Training;
+import com.example.gymcrm.entity.Training;
 
 public interface TrainingRepository extends JpaRepository<Training, Long> {
     @EntityGraph(attributePaths = {"trainer.user", "trainingType"})

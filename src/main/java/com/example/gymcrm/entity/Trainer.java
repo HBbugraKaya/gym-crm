@@ -1,4 +1,4 @@
-package com.example.gymcrm.domain;
+package com.example.gymcrm.entity;
 
 import java.util.Set;
 

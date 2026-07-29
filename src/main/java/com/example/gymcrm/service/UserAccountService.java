@@ -3,7 +3,7 @@ package com.example.gymcrm.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.gymcrm.domain.User;
+import com.example.gymcrm.entity.User;
 import com.example.gymcrm.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
