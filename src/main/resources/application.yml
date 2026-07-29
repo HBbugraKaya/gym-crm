@@ -5,9 +5,16 @@ spring:
     default: local
   jpa:
     open-in-view: false
-  web:
-    resources:
-      add-mappings: false
+
+gymcrm:
+  security:
+    jwt:
+      secret: ${GYMCRM_JWT_SECRET}
+      access-token-ttl: PT1H
+    cors:
+      allowed-origins:
+        - http://localhost:3000
+        - http://localhost:4200
 
 management:
   info:
@@ -21,9 +28,6 @@ management:
     web:
       exposure:
         include: health,info,prometheus
-  endpoint:
-    health:
-      show-details: never
 
 info:
   application:

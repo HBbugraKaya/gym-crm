@@ -6,13 +6,15 @@ spring:
     url: jdbc:h2:mem:gymcrm-local;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
     username: sa
     password: ""
-    driver-class-name: org.h2.Driver
   jpa:
     hibernate:
       ddl-auto: create-drop
-    properties:
-      hibernate:
-        format_sql: true
+
+gymcrm:
+  security:
+    jwt:
+      # Local-only fallback. Set GYMCRM_JWT_SECRET outside local development.
+      secret: ${GYMCRM_JWT_SECRET:local-development-secret-must-be-at-least-32-characters}
 
 management:
   endpoint:

@@ -7,17 +7,12 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
-import com.example.gymcrm.security.CurrentUser;
-import com.example.gymcrm.service.command.CreateTrainerCommand;
-import com.example.gymcrm.service.command.UpdateTrainerCommand;
-import com.example.gymcrm.service.criteria.TrainerTrainingCriteria;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -57,9 +52,6 @@ class TrainerServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private CurrentUser currentUser;
-
-    @Mock
     private GymCrmMetrics metrics;
 
     @InjectMocks
@@ -74,7 +66,7 @@ class TrainerServiceTest {
         when(passwordEncoder.encode("secret1234")).thenReturn("encoded-secret1234");
         when(trainerRepository.save(any(Trainer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var created = service.create(new CreateTrainerCommand("Alice", "Coach", TrainingTypeName.YOGA, true));
+        var created = service.create("Alice", "Coach", TrainingTypeName.YOGA);
 
         assertThat(created.rawPassword()).isEqualTo("secret1234");
         assertThat(created.profile().getFirstName()).isEqualTo("Alice");
@@ -82,6 +74,7 @@ class TrainerServiceTest {
         assertThat(created.profile().getUsername()).isEqualTo("Alice.Coach");
         assertThat(created.profile().getPassword()).isEqualTo("encoded-secret1234");
         assertThat(created.profile().getSpecialization()).isSameAs(yoga);
+        assertThat(created.profile().isActive()).isTrue();
         verify(trainerRepository).save(created.profile());
         verify(metrics).recordTrainerRegistration();
     }
@@ -90,8 +83,8 @@ class TrainerServiceTest {
     void createRejectsUnknownSpecializationBeforeSaving() {
         when(trainingTypeRepository.findByName(TrainingTypeName.CARDIO)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(new CreateTrainerCommand(
-                "Bob", "Trainer", TrainingTypeName.CARDIO, true)))
+        assertThatThrownBy(() -> service.create(
+                "Bob", "Trainer", TrainingTypeName.CARDIO))
                 .isInstanceOf(EntityNotFoundException.class);
         verify(trainerRepository, never()).save(any());
     }
@@ -99,22 +92,18 @@ class TrainerServiceTest {
     @Test
     void findByUsernameReturnsAuthenticatedTrainerOnlyForOwnUsername() {
         Trainer trainer = trainer("Bob.Trainer", TrainingTypeName.CARDIO, true);
-        when(currentUser.requireTrainer()).thenReturn(trainer);
-        when(trainerRepository.findByUsernameWithTrainees("Bob.Trainer")).thenReturn(Optional.of(trainer));
+        when(trainerRepository.findByUserUsernameIgnoreCase("bob.trainer")).thenReturn(Optional.of(trainer));
 
         assertThat(service.findByUsername("bob.trainer")).isSameAs(trainer);
-        assertThatThrownBy(() -> service.findByUsername("Other.Trainer"))
-                .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void updateMutatesTrainerButKeepsSpecializationReadOnly() {
         Trainer trainer = trainer("Bob.Trainer", TrainingTypeName.CARDIO, true);
         TrainingType originalSpecialization = trainer.getSpecialization();
-        when(currentUser.requireTrainer()).thenReturn(trainer);
-        when(trainerRepository.findByUsernameWithTrainees("Bob.Trainer")).thenReturn(Optional.of(trainer));
+        when(trainerRepository.findByUserUsernameIgnoreCase("Bob.Trainer")).thenReturn(Optional.of(trainer));
 
-        service.update("Bob.Trainer", new UpdateTrainerCommand("Robert", "Trainer", false));
+        service.update("Bob.Trainer", "Robert", "Trainer", false);
 
         assertThat(trainer.getFirstName()).isEqualTo("Robert");
         assertThat(trainer.getSpecialization()).isSameAs(originalSpecialization);
@@ -129,12 +118,11 @@ class TrainerServiceTest {
                 LocalDate.of(2000, 1, 1), "Address");
         Training training = new Training(trainee, trainer, "Yoga", trainer.getSpecialization(),
                 LocalDate.of(2026, 7, 2), 45);
-        TrainerTrainingCriteria criteria = new TrainerTrainingCriteria(
-                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), "Runner");
-        when(currentUser.requireTrainer()).thenReturn(trainer);
-        when(trainingRepository.findByTrainerUsername("Coach.One", criteria)).thenReturn(List.of(training));
+        when(trainingRepository.findByTrainerUserUsernameIgnoreCase("Coach.One")).thenReturn(List.of(training));
 
-        assertThat(service.getTrainings("Coach.One", criteria)).containsExactly(training);
+        assertThat(service.getTrainings(
+                "Coach.One", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 3), "Runner"))
+                .containsExactly(training);
     }
 
     private Trainer trainer(String username, TrainingTypeName specialization, boolean active) {

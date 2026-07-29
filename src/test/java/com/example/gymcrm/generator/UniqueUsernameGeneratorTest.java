@@ -21,24 +21,23 @@ class UniqueUsernameGeneratorTest {
 
     @Test
     void generatesBaseUsernameWhenNameIsUnique() {
-        when(userRepository.countByFirstNameAndLastName("John", "Smith")).thenReturn(0L);
-        when(userRepository.existsByUsername("John.Smith")).thenReturn(false);
+        when(userRepository.existsByUsernameIgnoreCase("John.Smith")).thenReturn(false);
 
         assertThat(generator.generate(" John ", " Smith ")).isEqualTo("John.Smith");
 
-        verify(userRepository).countByFirstNameAndLastName("John", "Smith");
-        verify(userRepository).existsByUsername("John.Smith");
+        verify(userRepository).existsByUsernameIgnoreCase("John.Smith");
     }
 
     @Test
     void appendsNextAvailableNumericSuffixForDuplicateNames() {
-        when(userRepository.countByFirstNameAndLastName("John", "Smith")).thenReturn(2L);
-        when(userRepository.existsByUsername("John.Smith2")).thenReturn(true);
-        when(userRepository.existsByUsername("John.Smith3")).thenReturn(false);
+        when(userRepository.existsByUsernameIgnoreCase("John.Smith")).thenReturn(true);
+        when(userRepository.existsByUsernameIgnoreCase("John.Smith1")).thenReturn(true);
+        when(userRepository.existsByUsernameIgnoreCase("John.Smith2")).thenReturn(false);
 
-        assertThat(generator.generate("John", "Smith")).isEqualTo("John.Smith3");
+        assertThat(generator.generate("John", "Smith")).isEqualTo("John.Smith2");
 
-        verify(userRepository).existsByUsername("John.Smith2");
-        verify(userRepository).existsByUsername("John.Smith3");
+        verify(userRepository).existsByUsernameIgnoreCase("John.Smith");
+        verify(userRepository).existsByUsernameIgnoreCase("John.Smith1");
+        verify(userRepository).existsByUsernameIgnoreCase("John.Smith2");
     }
 }

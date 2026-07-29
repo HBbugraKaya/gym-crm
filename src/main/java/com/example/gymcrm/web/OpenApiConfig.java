@@ -1,4 +1,4 @@
-package com.example.gymcrm.config;
+package com.example.gymcrm.web;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
@@ -13,10 +13,11 @@ import org.springframework.context.annotation.Configuration;
         description = "REST API for managing gym trainees, trainers, assignments and training sessions"
 ))
 @SecurityScheme(
-        name = OpenApiConfig.BASIC_AUTH_SCHEME,
+        name = OpenApiConfig.BEARER_AUTH_SCHEME,
         type = SecuritySchemeType.HTTP,
-        scheme = "basic"
+        scheme = "bearer",
+        bearerFormat = "JWT"
 )
 public class OpenApiConfig {
-    public static final String BASIC_AUTH_SCHEME = "basicAuth";
+    public static final String BEARER_AUTH_SCHEME = "bearerAuth";
 }

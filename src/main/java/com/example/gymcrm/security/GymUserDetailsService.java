@@ -4,47 +4,39 @@ import com.example.gymcrm.domain.User;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class GymUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final TraineeRepository traineeRepository;
     private final TrainerRepository trainerRepository;
 
-    public GymUserDetailsService(UserRepository userRepository,
-                                 TraineeRepository traineeRepository,
-                                 TrainerRepository trainerRepository) {
-        this.userRepository = userRepository;
-        this.traineeRepository = traineeRepository;
-        this.trainerRepository = trainerRepository;
-    }
-
     @Override
-    @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
+    public org.springframework.security.core.userdetails.User loadUserByUsername(String username) {
+        User user = userRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>(2);
-        if (traineeRepository.findByUsername(user.getUsername()).isPresent()) {
+        if (traineeRepository.existsByUserUsernameIgnoreCase(user.getUsername())) {
             authorities.add(new SimpleGrantedAuthority("ROLE_TRAINEE"));
         }
-        if (trainerRepository.findByUsername(user.getUsername()).isPresent()) {
+        if (trainerRepository.existsByUserUsernameIgnoreCase(user.getUsername())) {
             authorities.add(new SimpleGrantedAuthority("ROLE_TRAINER"));
         }
         if (authorities.isEmpty()) {
             throw new UsernameNotFoundException("User has no gym profile");
         }
-        return new GymUserPrincipal(user, authorities);
+        return new org.springframework.security.core.userdetails.User(
+                user.getUsername(), user.getPassword(), authorities);
     }
 }

@@ -1,14 +1,6 @@
-package com.example.gymcrm.web.controller;
+package com.example.gymcrm.web.dto;
 
 import com.example.gymcrm.domain.TrainingTypeName;
-import com.example.gymcrm.web.dto.AddTrainingRequest;
-import com.example.gymcrm.web.dto.ChangePasswordRequest;
-import com.example.gymcrm.web.dto.ChangeStatusRequest;
-import com.example.gymcrm.web.dto.TraineeRegistrationRequest;
-import com.example.gymcrm.web.dto.TrainerAssignmentsRequest;
-import com.example.gymcrm.web.dto.TrainerRegistrationRequest;
-import com.example.gymcrm.web.dto.UpdateTraineeRequest;
-import com.example.gymcrm.web.dto.UpdateTrainerRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -21,7 +13,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class RequestValidationTest {
+class DtoValidationTest {
     private static ValidatorFactory validatorFactory;
     private static Validator validator;
 
@@ -69,6 +61,7 @@ class RequestValidationTest {
         var missingAssignments = new TrainerAssignmentsRequest(null);
         var password = new ChangePasswordRequest(" ");
         var status = new ChangeStatusRequest(null);
+        var login = new LoginRequest(" ", "");
 
         assertThat(validator.validate(training))
                 .extracting(violation -> violation.getPropertyPath().toString())
@@ -85,6 +78,9 @@ class RequestValidationTest {
         assertThat(validator.validate(status))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .contains("active");
+        assertThat(validator.validate(login))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("username", "password");
     }
 
     @Test
@@ -105,5 +101,6 @@ class RequestValidationTest {
         assertThat(validator.validate(new TrainerAssignmentsRequest(List.of("alice.coach")))).isEmpty();
         assertThat(validator.validate(new ChangePasswordRequest("new-secret"))).isEmpty();
         assertThat(validator.validate(new ChangeStatusRequest(true))).isEmpty();
+        assertThat(validator.validate(new LoginRequest("john.smith", "secret"))).isEmpty();
     }
 }

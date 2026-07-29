@@ -8,7 +8,4 @@ import java.util.List;
 public record TrainerAssignmentsRequest(
         @NotNull List<@NotBlank String> trainerUsernames
 ) {
-    public TrainerAssignmentsRequest {
-        trainerUsernames = trainerUsernames == null ? null : List.copyOf(trainerUsernames);
-    }
 }

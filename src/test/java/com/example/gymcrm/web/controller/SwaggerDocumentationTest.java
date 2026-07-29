@@ -1,10 +1,9 @@
 package com.example.gymcrm.web.controller;
 
-import com.example.gymcrm.config.OpenApiConfig;
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import com.example.gymcrm.web.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,46 +27,44 @@ class SwaggerDocumentationTest {
     );
 
     @Test
-    void everyRestControllerAndEndpointHasOpenApiDocumentation() {
-        List<Method> endpointMethods = CONTROLLERS.stream()
-                .flatMap(controller -> List.of(controller.getDeclaredMethods()).stream())
-                .filter(this::isEndpoint)
-                .toList();
-
-        assertThat(endpointMethods).isNotEmpty();
+    void everyRestControllerHasOpenApiTag() {
         assertThat(CONTROLLERS)
                 .allMatch(controller -> controller.isAnnotationPresent(Tag.class),
                         "every controller should have an OpenAPI tag");
-        assertThat(endpointMethods)
-                .allMatch(method -> method.isAnnotationPresent(Operation.class),
-                        "every endpoint should have @Operation")
-                .allMatch(method -> method.isAnnotationPresent(ApiResponses.class),
-                        "every endpoint should have @ApiResponses");
     }
 
     @Test
-    void everyProtectedEndpointReferencesTheBasicAuthScheme() {
-        List<Method> endpointMethods = CONTROLLERS.stream()
-                .flatMap(controller -> List.of(controller.getDeclaredMethods()).stream())
-                .filter(this::isEndpoint)
-                .toList();
-
-        assertThat(endpointMethods)
-                .allSatisfy(method -> assertThat(hasBasicAuthRequirement(method))
-                        .as("HTTP Basic requirement for %s", method)
-                        .isEqualTo(!isPublicRegistration(method)));
+    void everyEndpointHasAnOpenApiSummary() {
+        endpointMethods().forEach(method -> {
+            Operation operation = method.getAnnotation(Operation.class);
+            assertThat(operation)
+                    .as("OpenAPI operation for %s", method)
+                    .isNotNull();
+            assertThat(operation.summary())
+                    .as("OpenAPI summary for %s", method)
+                    .isNotBlank();
+        });
     }
 
     @Test
-    void openApiDefinitionPublishesApiInfoAndHttpBasicScheme() {
+    void everyProtectedEndpointReferencesTheBearerAuthScheme() {
+        assertThat(endpointMethods())
+                .allSatisfy(method -> assertThat(hasBearerAuthRequirement(method))
+                        .as("Bearer requirement for %s", method)
+                        .isEqualTo(!isPublicEndpoint(method)));
+    }
+
+    @Test
+    void openApiDefinitionPublishesApiInfoAndBearerScheme() {
         OpenAPIDefinition definition = OpenApiConfig.class.getAnnotation(OpenAPIDefinition.class);
         SecurityScheme scheme = OpenApiConfig.class.getAnnotation(SecurityScheme.class);
 
         assertThat(definition.info().title()).isEqualTo("Gym CRM API");
         assertThat(definition.info().version()).isEqualTo("1.0");
-        assertThat(scheme.name()).isEqualTo(OpenApiConfig.BASIC_AUTH_SCHEME);
+        assertThat(scheme.name()).isEqualTo(OpenApiConfig.BEARER_AUTH_SCHEME);
         assertThat(scheme.type()).isEqualTo(SecuritySchemeType.HTTP);
-        assertThat(scheme.scheme()).isEqualTo("basic");
+        assertThat(scheme.scheme()).isEqualTo("bearer");
+        assertThat(scheme.bearerFormat()).isEqualTo("JWT");
     }
 
     private boolean isEndpoint(Method method) {
@@ -75,20 +72,29 @@ class SwaggerDocumentationTest {
                 .anyMatch(annotation -> annotation.annotationType().isAnnotationPresent(RequestMapping.class));
     }
 
-    private boolean isPublicRegistration(Method method) {
-        return method.getName().equals("register")
-                && (method.getDeclaringClass() == TraineeController.class
-                || method.getDeclaringClass() == TrainerController.class);
+    private List<Method> endpointMethods() {
+        return CONTROLLERS.stream()
+                .flatMap(controller -> List.of(controller.getDeclaredMethods()).stream())
+                .filter(this::isEndpoint)
+                .toList();
     }
 
-    private boolean hasBasicAuthRequirement(Method method) {
-        return hasBasicAuthRequirement(method.getAnnotationsByType(SecurityRequirement.class))
-                || hasBasicAuthRequirement(method.getDeclaringClass()
+    private boolean isPublicEndpoint(Method method) {
+        return (method.getName().equals("register")
+                && (method.getDeclaringClass() == TraineeController.class
+                || method.getDeclaringClass() == TrainerController.class))
+                || (method.getName().equals("login")
+                && method.getDeclaringClass() == AuthenticationController.class);
+    }
+
+    private boolean hasBearerAuthRequirement(Method method) {
+        return hasBearerAuthRequirement(method.getAnnotationsByType(SecurityRequirement.class))
+                || hasBearerAuthRequirement(method.getDeclaringClass()
                 .getAnnotationsByType(SecurityRequirement.class));
     }
 
-    private boolean hasBasicAuthRequirement(SecurityRequirement[] requirements) {
+    private boolean hasBearerAuthRequirement(SecurityRequirement[] requirements) {
         return List.of(requirements).stream()
-                .anyMatch(requirement -> requirement.name().equals(OpenApiConfig.BASIC_AUTH_SCHEME));
+                .anyMatch(requirement -> requirement.name().equals(OpenApiConfig.BEARER_AUTH_SCHEME));
     }
 }

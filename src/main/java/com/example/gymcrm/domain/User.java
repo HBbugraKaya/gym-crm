@@ -1,39 +1,47 @@
 package com.example.gymcrm.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+import java.time.Duration;
+import java.time.Instant;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_users_username", columnNames = "username")
-})
+@Table(name = "users")
+@Getter
+@ToString(exclude = "password")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "first_name", nullable = false)
+    @Setter
+    @Column(nullable = false)
     private String firstName;
 
-    @Column(name = "last_name", nullable = false)
+    @Setter
+    @Column(nullable = false)
     private String lastName;
 
-    @Column(name = "username", nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false, unique = true)
     private String username;
 
-    @Column(name = "password", nullable = false)
+    @Column(nullable = false)
     private String password;
 
+    @Setter
     @Column(name = "is_active", nullable = false)
     private boolean active;
 
-    protected User() {
-    }
+    @Column(nullable = false)
+    private int failedLoginAttempts;
+
+    private Instant lockedUntil;
 
     public User(String firstName, String lastName, String username, String password, boolean active) {
         this.firstName = firstName;
@@ -43,48 +51,29 @@ public class User {
         this.active = active;
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
     public void changePassword(String password) {
         this.password = password;
     }
 
-    public boolean isActive() {
-        return active;
+    public boolean isLockedAt(Instant now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
     }
 
-    public void setActive(boolean active) {
-        this.active = active;
+    public void clearExpiredLock(Instant now) {
+        if (lockedUntil != null && !lockedUntil.isAfter(now)) {
+            resetFailedLoginAttempts();
+        }
     }
 
-    @Override
-    public String toString() {
-        return "User{id=" + id + ", username='" + username + "', active=" + active + '}';
+    public void recordFailedLogin(Instant now, int maxAttempts, Duration lockDuration) {
+        failedLoginAttempts++;
+        if (failedLoginAttempts >= maxAttempts) {
+            lockedUntil = now.plus(lockDuration);
+        }
+    }
+
+    public void resetFailedLoginAttempts() {
+        failedLoginAttempts = 0;
+        lockedUntil = null;
     }
 }

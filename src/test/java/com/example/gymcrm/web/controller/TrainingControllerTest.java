@@ -1,7 +1,6 @@
 package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.service.TrainingService;
-import com.example.gymcrm.service.command.AddTrainingCommand;
 import com.example.gymcrm.web.dto.AddTrainingRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,7 +30,7 @@ class TrainingControllerTest {
         var response = controller.addTraining(request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(trainingService).addTraining(new AddTrainingCommand(
-                "john.smith", "alice.coach", "Morning yoga", date, 60));
+        verify(trainingService).addTraining(
+                "john.smith", "alice.coach", "Morning yoga", date, 60);
     }
 }

@@ -6,7 +6,6 @@ spring:
     url: jdbc:h2:file:./data/gymcrm-dev;AUTO_SERVER=TRUE;MODE=PostgreSQL
     username: gymcrm_dev
     password: ""
-    driver-class-name: org.h2.Driver
   jpa:
     hibernate:
       ddl-auto: update
