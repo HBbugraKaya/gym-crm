@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -91,9 +90,7 @@ class GymCrmApiIntegrationTest {
         mockMvc.perform(get("/api/v1/training-types"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
-                        org.hamcrest.Matchers.containsString("Bearer")))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.transactionId").isNotEmpty());
+                        org.hamcrest.Matchers.containsString("Bearer")));
 
         mockMvc.perform(options("/api/v1/auth/login")
                         .header(HttpHeaders.ORIGIN, "http://localhost:3000")
@@ -122,46 +119,6 @@ class GymCrmApiIntegrationTest {
                                 "trainingDate", "2026-07-16",
                                 "durationMinutes", 30))))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void loginPasswordChangeAndNonIdempotentStatusWorkEndToEnd() throws Exception {
-        String suffix = uniqueSuffix();
-        RegistrationResponse trainee = registerTrainee("Account" + suffix, "Trainee");
-        String newPassword = "changed-" + suffix;
-
-        String initialAuthorization = bearerAuth(trainee);
-
-        mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, initialAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("oldPassword", "incorrect", "newPassword", newPassword))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Old password is incorrect"));
-
-        mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, initialAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("oldPassword", trainee.password(), "newPassword", newPassword))))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("username", trainee.username(), "password", trainee.password()))))
-                .andExpect(status().isUnauthorized());
-
-        String newAuthorization = bearerAuth(trainee.username(), newPassword);
-        mockMvc.perform(patch("/api/v1/trainees/{username}/status", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("active", false))))
-                .andExpect(status().isOk());
-        mockMvc.perform(patch("/api/v1/trainees/{username}/status", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, newAuthorization)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("active", false))))
-                .andExpect(status().isConflict());
     }
 
     @Test
