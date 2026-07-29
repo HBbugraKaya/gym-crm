@@ -49,14 +49,14 @@ public class TraineeController {
 
     @GetMapping("/{username}")
     @Operation(summary = "Get a trainee profile")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public TraineeProfileResponse getProfile(@PathVariable String username) {
         return mapper.toTraineeProfile(traineeService.findByUsername(username));
     }
 
     @PutMapping("/{username}")
     @Operation(summary = "Update a trainee profile")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public TraineeProfileResponse updateProfile(
             @PathVariable String username,
             @Valid @RequestBody UpdateTraineeRequest request) {
@@ -72,7 +72,7 @@ public class TraineeController {
 
     @DeleteMapping("/{username}")
     @Operation(summary = "Delete a trainee profile")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public ResponseEntity<Void> deleteProfile(@PathVariable String username) {
         traineeService.deleteByUsername(username);
         return ResponseEntity.ok().build();
@@ -80,14 +80,14 @@ public class TraineeController {
 
     @GetMapping("/{username}/available-trainers")
     @Operation(summary = "Get active trainers not assigned to a trainee")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public List<TrainerSummaryResponse> getAvailableTrainers(@PathVariable String username) {
         return mapper.toTrainerSummaries(traineeService.getUnassignedTrainers(username));
     }
 
     @PutMapping("/{username}/trainers")
     @Operation(summary = "Replace a trainee's trainer assignments")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public List<TrainerSummaryResponse> updateTrainers(
             @PathVariable String username,
             @Valid @RequestBody TrainerAssignmentsRequest request) {
@@ -97,7 +97,7 @@ public class TraineeController {
 
     @GetMapping("/{username}/trainings")
     @Operation(summary = "Get a trainee's trainings")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public List<TraineeTrainingResponse> getTrainings(
             @PathVariable String username,
             @RequestParam(required = false) LocalDate periodFrom,

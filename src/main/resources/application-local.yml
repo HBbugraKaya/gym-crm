@@ -10,6 +10,12 @@ spring:
     hibernate:
       ddl-auto: create-drop
 
+gymcrm:
+  security:
+    jwt:
+      # Local-only fallback. Set GYMCRM_JWT_SECRET outside local development.
+      secret: ${GYMCRM_JWT_SECRET:local-development-secret-must-be-at-least-32-characters}
+
 management:
   endpoint:
     health:

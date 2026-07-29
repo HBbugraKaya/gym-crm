@@ -45,14 +45,14 @@ public class TrainerController {
 
     @GetMapping("/{username}")
     @Operation(summary = "Get a trainer profile")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public TrainerProfileResponse getProfile(@PathVariable String username) {
         return mapper.toTrainerProfile(trainerService.findByUsername(username));
     }
 
     @PutMapping("/{username}")
     @Operation(summary = "Update a trainer profile")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public TrainerProfileResponse updateProfile(
             @PathVariable String username,
             @Valid @RequestBody UpdateTrainerRequest request) {
@@ -62,7 +62,7 @@ public class TrainerController {
 
     @GetMapping("/{username}/trainings")
     @Operation(summary = "Get a trainer's trainings")
-    @SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
     public List<TrainerTrainingResponse> getTrainings(
             @PathVariable String username,
             @RequestParam(required = false) LocalDate periodFrom,

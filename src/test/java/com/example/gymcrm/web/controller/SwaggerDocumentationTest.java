@@ -47,23 +47,24 @@ class SwaggerDocumentationTest {
     }
 
     @Test
-    void everyProtectedEndpointReferencesTheBasicAuthScheme() {
+    void everyProtectedEndpointReferencesTheBearerAuthScheme() {
         assertThat(endpointMethods())
-                .allSatisfy(method -> assertThat(hasBasicAuthRequirement(method))
-                        .as("HTTP Basic requirement for %s", method)
-                        .isEqualTo(!isPublicRegistration(method)));
+                .allSatisfy(method -> assertThat(hasBearerAuthRequirement(method))
+                        .as("Bearer requirement for %s", method)
+                        .isEqualTo(!isPublicEndpoint(method)));
     }
 
     @Test
-    void openApiDefinitionPublishesApiInfoAndHttpBasicScheme() {
+    void openApiDefinitionPublishesApiInfoAndBearerScheme() {
         OpenAPIDefinition definition = OpenApiConfig.class.getAnnotation(OpenAPIDefinition.class);
         SecurityScheme scheme = OpenApiConfig.class.getAnnotation(SecurityScheme.class);
 
         assertThat(definition.info().title()).isEqualTo("Gym CRM API");
         assertThat(definition.info().version()).isEqualTo("1.0");
-        assertThat(scheme.name()).isEqualTo(OpenApiConfig.BASIC_AUTH_SCHEME);
+        assertThat(scheme.name()).isEqualTo(OpenApiConfig.BEARER_AUTH_SCHEME);
         assertThat(scheme.type()).isEqualTo(SecuritySchemeType.HTTP);
-        assertThat(scheme.scheme()).isEqualTo("basic");
+        assertThat(scheme.scheme()).isEqualTo("bearer");
+        assertThat(scheme.bearerFormat()).isEqualTo("JWT");
     }
 
     private boolean isEndpoint(Method method) {
@@ -78,20 +79,22 @@ class SwaggerDocumentationTest {
                 .toList();
     }
 
-    private boolean isPublicRegistration(Method method) {
-        return method.getName().equals("register")
+    private boolean isPublicEndpoint(Method method) {
+        return (method.getName().equals("register")
                 && (method.getDeclaringClass() == TraineeController.class
-                || method.getDeclaringClass() == TrainerController.class);
+                || method.getDeclaringClass() == TrainerController.class))
+                || (method.getName().equals("login")
+                && method.getDeclaringClass() == AuthenticationController.class);
     }
 
-    private boolean hasBasicAuthRequirement(Method method) {
-        return hasBasicAuthRequirement(method.getAnnotationsByType(SecurityRequirement.class))
-                || hasBasicAuthRequirement(method.getDeclaringClass()
+    private boolean hasBearerAuthRequirement(Method method) {
+        return hasBearerAuthRequirement(method.getAnnotationsByType(SecurityRequirement.class))
+                || hasBearerAuthRequirement(method.getDeclaringClass()
                 .getAnnotationsByType(SecurityRequirement.class));
     }
 
-    private boolean hasBasicAuthRequirement(SecurityRequirement[] requirements) {
+    private boolean hasBearerAuthRequirement(SecurityRequirement[] requirements) {
         return List.of(requirements).stream()
-                .anyMatch(requirement -> requirement.name().equals(OpenApiConfig.BASIC_AUTH_SCHEME));
+                .anyMatch(requirement -> requirement.name().equals(OpenApiConfig.BEARER_AUTH_SCHEME));
     }
 }

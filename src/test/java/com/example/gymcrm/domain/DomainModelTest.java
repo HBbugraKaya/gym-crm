@@ -2,6 +2,8 @@ package com.example.gymcrm.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -44,5 +46,22 @@ class DomainModelTest {
         assertThat(training.getTrainingType()).isSameAs(type);
         assertThat(training.getDurationMinutes()).isEqualTo(30);
         assertThat(user.toString()).doesNotContain("newPassword");
+    }
+
+    @Test
+    void userLocksAfterTheConfiguredNumberOfFailedLoginsAndResetsAfterExpiry() {
+        User user = new User("First", "Last", "First.Last", "password12", true);
+        Instant now = Instant.parse("2026-07-29T10:00:00Z");
+
+        user.recordFailedLogin(now, 3, Duration.ofMinutes(5));
+        user.recordFailedLogin(now, 3, Duration.ofMinutes(5));
+        assertThat(user.isLockedAt(now)).isFalse();
+
+        user.recordFailedLogin(now, 3, Duration.ofMinutes(5));
+        assertThat(user.isLockedAt(now.plusSeconds(1))).isTrue();
+
+        user.clearExpiredLock(now.plus(Duration.ofMinutes(5)));
+        assertThat(user.isLockedAt(now.plus(Duration.ofMinutes(5)))).isFalse();
+        assertThat(user.getFailedLoginAttempts()).isZero();
     }
 }

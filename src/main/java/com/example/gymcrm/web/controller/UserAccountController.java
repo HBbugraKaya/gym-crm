@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/users")
 @Tag(name = "User account", description = "Authenticated account management")
-@SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
 @RequiredArgsConstructor
 public class UserAccountController {
     private final UserAccountService userAccountService;
@@ -28,7 +28,7 @@ public class UserAccountController {
     @PutMapping("/{username}/password")
     @Operation(
             summary = "Change password",
-            description = "The current username and password are supplied through HTTP Basic authentication")
+            description = "The current username is supplied through the Bearer JWT")
     public ResponseEntity<Void> changePassword(
             @PathVariable String username,
             @Valid @RequestBody ChangePasswordRequest request) {

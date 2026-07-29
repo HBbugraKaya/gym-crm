@@ -16,9 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import javax.sql.DataSource;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -81,18 +80,24 @@ class GymCrmApiIntegrationTest {
         JsonNode apiDocs = jsonTree(apiDocsResult);
         assertThat(apiDocs.path("openapi").asText()).startsWith("3.");
         assertThat(apiDocs.path("info").path("title").asText()).isEqualTo("Gym CRM API");
-        assertThat(apiDocs.path("components").path("securitySchemes").path("basicAuth").path("scheme").asText())
-                .isEqualTo("basic");
+        assertThat(apiDocs.path("components").path("securitySchemes").path("bearerAuth").path("scheme").asText())
+                .isEqualTo("bearer");
         assertThat(apiDocs.path("paths").path("/api/v1/trainees").path("post").has("security")).isFalse();
         assertThat(apiDocs.path("paths").path("/api/v1/trainees/{username}").path("get")
-                .path("security").toString()).contains("basicAuth");
+                .path("security").toString()).contains("bearerAuth");
 
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/training-types"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
-                        org.hamcrest.Matchers.containsString("gym-crm")));
+                        org.hamcrest.Matchers.containsString("Bearer")));
+
+        mockMvc.perform(options("/api/v1/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:3000")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000"));
     }
 
     @Test
@@ -102,11 +107,11 @@ class GymCrmApiIntegrationTest {
         RegistrationResponse second = registerTrainee("Second" + suffix, "Trainee");
 
         mockMvc.perform(get("/api/v1/trainees/{username}", second.username())
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(first)))
+                        .header(HttpHeaders.AUTHORIZATION, bearerAuth(first)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/trainings")
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(first))
+                        .header(HttpHeaders.AUTHORIZATION, bearerAuth(first))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "traineeUsername", first.username(),
@@ -123,24 +128,20 @@ class GymCrmApiIntegrationTest {
         RegistrationResponse trainee = registerTrainee("Account" + suffix, "Trainee");
         String newPassword = "changed-" + suffix;
 
-        mockMvc.perform(get("/api/v1/auth/login")
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
-                .andExpect(status().isOk());
+        String initialAuthorization = bearerAuth(trainee);
 
         mockMvc.perform(put("/api/v1/users/{username}/password", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee))
+                        .header(HttpHeaders.AUTHORIZATION, initialAuthorization)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("newPassword", newPassword))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/auth/login")
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee)))
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("username", trainee.username(), "password", trainee.password()))))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/api/v1/auth/login")
-                        .header(HttpHeaders.AUTHORIZATION, basicAuth(trainee.username(), newPassword)))
-                .andExpect(status().isOk());
 
-        String newAuthorization = basicAuth(trainee.username(), newPassword);
+        String newAuthorization = bearerAuth(trainee.username(), newPassword);
         mockMvc.perform(patch("/api/v1/users/{username}/status", trainee.username())
                         .header(HttpHeaders.AUTHORIZATION, newAuthorization)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,8 +159,8 @@ class GymCrmApiIntegrationTest {
         String suffix = uniqueSuffix();
         RegistrationResponse trainee = registerTrainee("Runner" + suffix, "Trainee");
         RegistrationResponse trainer = registerTrainer("Coach" + suffix, "Trainer", "YOGA");
-        String traineeAuthorization = basicAuth(trainee);
-        String trainerAuthorization = basicAuth(trainer);
+        String traineeAuthorization = bearerAuth(trainee);
+        String trainerAuthorization = bearerAuth(trainer);
 
         MvcResult availableResult = mockMvc.perform(
                         get("/api/v1/trainees/{username}/available-trainers", trainee.username())
@@ -237,6 +238,33 @@ class GymCrmApiIntegrationTest {
         assertThat(countUsers(trainer.username())).isEqualTo(1);
     }
 
+    @Test
+    void thirdFailedLoginLocksTheUserAndLogoutRevokesTheJwt() throws Exception {
+        String suffix = uniqueSuffix();
+        RegistrationResponse trainee = registerTrainee("Secure" + suffix, "Trainee");
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("username", trainee.username(), "password", "wrong-password"))))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("username", trainee.username(), "password", trainee.password()))))
+                .andExpect(status().isLocked());
+
+        RegistrationResponse logoutUser = registerTrainee("Logout" + suffix, "Trainee");
+        String authorization = bearerAuth(logoutUser);
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/trainees/{username}", logoutUser.username())
+                        .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isUnauthorized());
+    }
+
     private RegistrationResponse registerTrainee(String firstName, String lastName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/trainees")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -275,13 +303,17 @@ class GymCrmApiIntegrationTest {
         return objectMapper.writeValueAsString(value);
     }
 
-    private String basicAuth(RegistrationResponse registration) {
-        return basicAuth(registration.username(), registration.password());
+    private String bearerAuth(RegistrationResponse registration) throws Exception {
+        return bearerAuth(registration.username(), registration.password());
     }
 
-    private String basicAuth(String username, String password) {
-        String credentials = username + ":" + password;
-        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+    private String bearerAuth(String username, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("username", username, "password", password))))
+                .andExpect(status().isOk())
+                .andReturn();
+        return "Bearer " + jsonTree(result).path("accessToken").asText();
     }
 
     private long countTrainees(String username) {

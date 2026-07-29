@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/trainings")
 @Tag(name = "Trainings", description = "Training session management")
-@SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
 @RequiredArgsConstructor
 public class TrainingController {
     private final TrainingService trainingService;

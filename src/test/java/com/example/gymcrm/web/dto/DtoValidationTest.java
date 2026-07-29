@@ -61,6 +61,7 @@ class DtoValidationTest {
         var missingAssignments = new TrainerAssignmentsRequest(null);
         var password = new ChangePasswordRequest(" ");
         var status = new ChangeStatusRequest(null);
+        var login = new LoginRequest(" ", "");
 
         assertThat(validator.validate(training))
                 .extracting(violation -> violation.getPropertyPath().toString())
@@ -77,6 +78,9 @@ class DtoValidationTest {
         assertThat(validator.validate(status))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .contains("active");
+        assertThat(validator.validate(login))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("username", "password");
     }
 
     @Test
@@ -97,5 +101,6 @@ class DtoValidationTest {
         assertThat(validator.validate(new TrainerAssignmentsRequest(List.of("alice.coach")))).isEmpty();
         assertThat(validator.validate(new ChangePasswordRequest("new-secret"))).isEmpty();
         assertThat(validator.validate(new ChangeStatusRequest(true))).isEmpty();
+        assertThat(validator.validate(new LoginRequest("john.smith", "secret"))).isEmpty();
     }
 }

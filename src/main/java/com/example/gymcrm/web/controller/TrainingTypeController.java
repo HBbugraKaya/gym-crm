@@ -17,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/training-types")
 @Tag(name = "Training types", description = "Immutable training-type catalog")
-@SecurityRequirement(name = OpenApiConfig.BASIC_AUTH_SCHEME)
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
 @RequiredArgsConstructor
 public class TrainingTypeController {
     private final TrainingTypeRepository trainingTypeRepository;

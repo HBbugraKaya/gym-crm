@@ -6,6 +6,16 @@ spring:
   jpa:
     open-in-view: false
 
+gymcrm:
+  security:
+    jwt:
+      secret: ${GYMCRM_JWT_SECRET}
+      access-token-ttl: PT1H
+    cors:
+      allowed-origins:
+        - http://localhost:3000
+        - http://localhost:4200
+
 management:
   info:
     env:

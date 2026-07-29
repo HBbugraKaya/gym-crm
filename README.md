@@ -10,12 +10,12 @@ The application uses a small layered design and lets Spring Boot own framework c
 - `bootstrap`: startup data initialization
 - `service`: use cases, transaction boundaries and method-level authorization
 - `repository`: Spring Data JPA derived queries and focused `@EntityGraph` declarations
-- `security`: Spring Security HTTP Basic authentication and BCrypt password hashing
+- `security`: Spring Security JWT authentication, BCrypt password hashing and login protection
 - `domain`: trainees, trainers, users, training types and trainings
 - `observability`: Actuator health indicators and low-cardinality Micrometer metrics
 
 There are no custom authentication principals, repository implementations or framework-level error wrappers.
-JWT, Flyway and Docker are intentionally out of scope.
+Flyway and Docker are intentionally out of scope.
 
 ## Build and run
 
@@ -66,12 +66,17 @@ Production uses the equivalent `GYMCRM_PROD_DB_URL`, `GYMCRM_PROD_DB_USERNAME` a
 
 ## Authentication
 
-Trainee and trainer registration (`POST /api/v1/trainees`, `POST /api/v1/trainers`) are public. Every
-other `/api/**` endpoint requires HTTP Basic credentials validated by Spring Security. Passwords are
-stored with BCrypt; registration still returns the one-time plaintext password in the response body.
-Profile-specific operations verify that the authenticated username matches the requested profile.
-Spring Method Security owns the role and self-access checks.
-Inactive users can still authenticate because `UserDetails.isEnabled()` is always true.
+Trainee and trainer registration (`POST /api/v1/trainees`, `POST /api/v1/trainers`) and login
+(`POST /api/v1/auth/login`) are public. Login accepts a username/password pair and returns a one-hour
+Bearer JWT. Every other `/api/**` endpoint requires that JWT. Passwords are stored with BCrypt;
+registration still returns the one-time plaintext password in the response body. Profile-specific
+operations verify that the authenticated username matches the requested profile. Spring Method Security
+owns the role and self-access checks.
+
+Three failed login attempts lock an account for five minutes. `POST /api/v1/auth/logout` revokes the
+current token, so it cannot be used again before it expires. Set `GYMCRM_JWT_SECRET` to a secret of at
+least 32 characters outside the `local` profile. Browser clients are allowed only from the configured
+`gymcrm.security.cors.allowed-origins` origins.
 
 Actuator endpoints (`/actuator/**`) are public operational endpoints and do not require gym credentials.
 HTTP and validation errors use Spring Boot's standard responses. Unauthorized requests include
@@ -85,8 +90,8 @@ Springdoc generates an OpenAPI 3 description and an interactive Swagger UI from 
 - OpenAPI JSON: `/v3/api-docs`
 - Swagger UI: `/swagger-ui/index.html`
 
-The documentation declares the API title/version, endpoint tags and the HTTP Basic security scheme.
-Profile registration operations are documented as public; protected operations reference `basicAuth`. Documentation
+The documentation declares the API title/version, endpoint tags and the Bearer JWT security scheme.
+Profile registration and login operations are documented as public; protected operations reference `bearerAuth`. Documentation
 endpoints are public so the API can be explored before credentials are created.
 
 ## Actuator and Prometheus
