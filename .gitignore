@@ -7,6 +7,10 @@ target/
 .DS_Store
 hs_err_pid*
 
+# Local Postman workspace metadata
+.postman/
+postman/
+
 .excalidraw-tmp/
 architecture.excalidraw
 architecture.md
