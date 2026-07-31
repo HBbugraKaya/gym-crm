@@ -1,5 +1,6 @@
 package com.example.gymcrm.web.controller;
 
+import com.example.gymcrm.web.dto.*;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,12 +11,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.gymcrm.service.TraineeService;
-import com.example.gymcrm.web.dto.RegistrationResponse;
-import com.example.gymcrm.web.dto.TraineeProfileResponse;
-import com.example.gymcrm.web.dto.TraineeRegistrationRequest;
-import com.example.gymcrm.web.dto.TraineeUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -52,5 +51,41 @@ public class TraineeController {
     @DeleteMapping("/{username}")
     public void delete(@PathVariable String username) {
         traineeService.deleteByUsername(username);
+    }
+
+    @GetMapping("/{username}/available-trainers")
+    public List<TrainerSummaryResponse> getAvailableTrainers(@PathVariable String username) {
+        var trainers = traineeService.getUnassignedTrainers(username);
+        return trainers.stream()
+                .map(t -> {
+                    var user = t.getUser();
+                    return new TrainerSummaryResponse(
+                            user.getUsername(),
+                            user.getFirstName(),
+                            user.getLastName(),
+                            t.getSpecialization().getName()
+                    );
+                })
+                .toList();
+    }
+
+    @PutMapping("/{username}/trainers")
+    public List<TrainerSummaryResponse> updateTrainers(
+            @PathVariable String username,
+            @RequestBody TrainerAssignmentsRequest request) {
+
+        var trainee = traineeService.updateTrainers(username, request.trainerUsernames());
+
+        return trainee.getTrainers().stream()
+                .map(t -> {
+                    var user = t.getUser();
+                    return new TrainerSummaryResponse(
+                            user.getUsername(),
+                            user.getFirstName(),
+                            user.getLastName(),
+                            t.getSpecialization().getName()
+                    );
+                })
+                .toList();
     }
 }

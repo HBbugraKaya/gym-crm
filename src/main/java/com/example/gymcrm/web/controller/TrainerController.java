@@ -1,5 +1,6 @@
 package com.example.gymcrm.web.controller;
 
+import com.example.gymcrm.web.dto.*;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -9,10 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.gymcrm.service.TrainerService;
-import com.example.gymcrm.web.dto.RegistrationResponse;
-import com.example.gymcrm.web.dto.TrainerProfileResponse;
-import com.example.gymcrm.web.dto.TrainerRegistrationRequest;
-import com.example.gymcrm.web.dto.TrainerUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
 
