@@ -1,19 +1,14 @@
 package com.example.gymcrm.web.controller;
 
+import com.example.gymcrm.entity.TrainingTypeName;
 import com.example.gymcrm.web.dto.*;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.example.gymcrm.service.TraineeService;
 
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -86,6 +81,25 @@ public class TraineeController {
                             t.getSpecialization().getName()
                     );
                 })
+                .toList();
+    }
+
+    @GetMapping("/{username}/trainings")
+    public List<TraineeTrainingResponse> getTrainings(@PathVariable String username,
+                                                      @RequestParam(required = false) LocalDate periodFrom,
+                                                      @RequestParam(required = false) LocalDate periodTo,
+                                                      @RequestParam(required = false) String trainerName,
+                                                      @RequestParam(required = false) TrainingTypeName trainingType ) {
+
+        var trainers = traineeService.getTrainings(username, periodFrom, periodTo, trainerName, trainingType);
+        return trainers.stream()
+                .map(t -> new TraineeTrainingResponse(
+                        t.getTrainingName(),
+                        t.getTrainingType().getName(),
+                        t.getTrainingDate(),
+                        t.getTrainingDuration(),
+                        t.getTrainer().getUser().getUsername()
+                ))
                 .toList();
     }
 }
