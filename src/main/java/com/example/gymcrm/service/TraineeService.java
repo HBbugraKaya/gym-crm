@@ -56,18 +56,14 @@ public class TraineeService {
     }
 
     public Trainee selectByUsername(String username) {
-        return traineeRepository.findByUserUsernameIgnoreCase(username)
+        return traineeRepository
+                .findByUserUsernameIgnoreCase(username)
                 .orElseThrow(() -> new RuntimeException("Trainee not found"));
     }
 
     @Transactional
     public Trainee update(
-            String username,
-            String firstName,
-            String lastName,
-            LocalDate dateOfBirth,
-            String address,
-            boolean active) {
+            String username, String firstName, String lastName, LocalDate dateOfBirth, String address, boolean active) {
         Trainee trainee = selectByUsername(username);
         User user = trainee.getUser();
 
@@ -87,7 +83,8 @@ public class TraineeService {
 
         Set<Trainer> trainers = new HashSet<>();
         for (String trainerUsername : trainerUsernames) {
-            Trainer trainer = trainerRepository.findByUserUsernameIgnoreCase(trainerUsername)
+            Trainer trainer = trainerRepository
+                    .findByUserUsernameIgnoreCase(trainerUsername)
                     .orElseThrow(() -> new RuntimeException("Trainer not found"));
             trainers.add(trainer);
         }
@@ -106,9 +103,8 @@ public class TraineeService {
     public List<Trainer> getUnassignedTrainers(String traineeUsername) {
         Trainee trainee = selectByUsername(traineeUsername);
 
-        Set<Long> assignedIds = trainee.getTrainers().stream()
-                .map(Trainer::getId)
-                .collect(Collectors.toSet());
+        Set<Long> assignedIds =
+                trainee.getTrainers().stream().map(Trainer::getId).collect(Collectors.toSet());
 
         if (assignedIds.isEmpty()) {
             return trainerRepository.findByUser_IsActiveTrue();
@@ -118,19 +114,13 @@ public class TraineeService {
     }
 
     public List<Training> getTrainings(
-            String traineeUsername,
-            LocalDate from,
-            LocalDate to,
-            String trainerName,
-            TrainingTypeName trainingType) {
-        return trainingRepository.findByTrainee_User_UsernameIgnoreCase(traineeUsername)
-                .stream()
+            String traineeUsername, LocalDate from, LocalDate to, String trainerName, TrainingTypeName trainingType) {
+        return trainingRepository.findByTrainee_User_UsernameIgnoreCase(traineeUsername).stream()
                 .filter(t -> from == null || !t.getTrainingDate().isBefore(from))
                 .filter(t -> to == null || !t.getTrainingDate().isAfter(to))
-                .filter(t -> trainerName == null || t.getTrainer().getUser().getUsername()
-                        .equalsIgnoreCase(trainerName))
+                .filter(t -> trainerName == null
+                        || t.getTrainer().getUser().getUsername().equalsIgnoreCase(trainerName))
                 .filter(t -> trainingType == null || t.getTrainingType().getName() == trainingType)
                 .toList();
     }
-
 }

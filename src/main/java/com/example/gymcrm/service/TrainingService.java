@@ -27,18 +27,22 @@ public class TrainingService {
     private final TrainingTypeRepository trainingTypeRepository;
 
     @Transactional
-    public Training create(String traineeUsername,
+    public Training create(
+            String traineeUsername,
             String trainerUsername,
             String trainingName,
             TrainingTypeName trainingType,
             LocalDate trainingDate,
             int duration) {
 
-        Trainee trainee = traineeRepository.findByUserUsernameIgnoreCase(traineeUsername)
+        Trainee trainee = traineeRepository
+                .findByUserUsernameIgnoreCase(traineeUsername)
                 .orElseThrow(() -> new RuntimeException("Trainee not found"));
-        Trainer trainer = trainerRepository.findByUserUsernameIgnoreCase(trainerUsername)
+        Trainer trainer = trainerRepository
+                .findByUserUsernameIgnoreCase(trainerUsername)
                 .orElseThrow(() -> new RuntimeException("Trainer not found"));
-        TrainingType type = trainingTypeRepository.findByName(trainingType)
+        TrainingType type = trainingTypeRepository
+                .findByName(trainingType)
                 .orElseThrow(() -> new RuntimeException("Training type not found"));
 
         Training training = new Training();

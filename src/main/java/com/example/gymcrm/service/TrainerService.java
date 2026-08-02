@@ -32,11 +32,9 @@ public class TrainerService {
     private final TrainingRepository trainingRepository;
 
     @Transactional
-    public CreatedAccount<Trainer> create(
-            String firstName,
-            String lastName,
-            TrainingTypeName specialization) {
-        TrainingType trainingType = trainingTypeRepository.findByName(specialization)
+    public CreatedAccount<Trainer> create(String firstName, String lastName, TrainingTypeName specialization) {
+        TrainingType trainingType = trainingTypeRepository
+                .findByName(specialization)
                 .orElseThrow(() -> new RuntimeException("Training type not found: " + specialization));
 
         String username = usernameGenerator.generateUsername(firstName, lastName);
@@ -59,16 +57,13 @@ public class TrainerService {
     }
 
     public Trainer selectByUsername(String username) {
-        return trainerRepository.findByUserUsernameIgnoreCase(username)
+        return trainerRepository
+                .findByUserUsernameIgnoreCase(username)
                 .orElseThrow(() -> new RuntimeException("Trainer not found"));
     }
 
     @Transactional
-    public Trainer update(
-            String username,
-            String firstName,
-            String lastName,
-            boolean active) {
+    public Trainer update(String username, String firstName, String lastName, boolean active) {
         Trainer trainer = selectByUsername(username);
         User user = trainer.getUser();
 
@@ -79,18 +74,12 @@ public class TrainerService {
         return trainer;
     }
 
-    public List<Training> getTrainings(
-            String trainerUsername,
-            LocalDate from,
-            LocalDate to,
-            String traineeName) {
-        return trainingRepository.findByTrainer_User_UsernameIgnoreCase(trainerUsername)
-                .stream()
+    public List<Training> getTrainings(String trainerUsername, LocalDate from, LocalDate to, String traineeName) {
+        return trainingRepository.findByTrainer_User_UsernameIgnoreCase(trainerUsername).stream()
                 .filter(t -> from == null || !t.getTrainingDate().isBefore(from))
                 .filter(t -> to == null || !t.getTrainingDate().isAfter(to))
-                .filter(t -> traineeName == null || t.getTrainee().getUser().getUsername()
-                        .equalsIgnoreCase(traineeName))
+                .filter(t -> traineeName == null
+                        || t.getTrainee().getUser().getUsername().equalsIgnoreCase(traineeName))
                 .toList();
     }
-
 }

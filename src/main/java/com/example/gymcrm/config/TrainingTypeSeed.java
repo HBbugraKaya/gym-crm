@@ -17,15 +17,14 @@ public class TrainingTypeSeed implements ApplicationRunner {
         this.trainingTypeRepository = trainingTypeRepository;
     }
 
-    @Override 
-    public void run(ApplicationArguments args){
-        for (TrainingTypeName type : TrainingTypeName.values()){
-            if(!trainingTypeRepository.existsByName(type)){
+    @Override
+    public void run(ApplicationArguments args) {
+        for (TrainingTypeName type : TrainingTypeName.values()) {
+            if (!trainingTypeRepository.existsByName(type)) {
                 TrainingType trainingType = new TrainingType();
                 trainingType.setName(type);
                 trainingTypeRepository.save(trainingType);
             }
         }
     }
-
 }
