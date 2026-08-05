@@ -16,4 +16,11 @@ public class UserAccountController {
         userAccountService.changePassword(username, request.oldPassword(), request.newPassword());
     }
 
+    @GetMapping("/login")
+    public void login(@RequestParam String username, @RequestParam String password) {
+        if(!userAccountService.matchesCredentials(username, password)) {
+            throw new RuntimeException("Invalid credentials");
+        }
+    }
+
 }
