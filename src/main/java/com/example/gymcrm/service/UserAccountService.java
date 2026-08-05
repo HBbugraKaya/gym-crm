@@ -1,5 +1,6 @@
 package com.example.gymcrm.service;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class UserAccountService {
-
+    private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
 
     public boolean matchesCredentials(String username, String password) {
@@ -19,7 +20,7 @@ public class UserAccountService {
                 .findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return user.getPassword().equals(password);
+        return passwordEncoder.matches(password, user.getPassword());
     }
 
     @Transactional
@@ -27,9 +28,9 @@ public class UserAccountService {
         User user = userRepository
                 .findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        if (!user.getPassword().equals(oldPassword)) {
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new RuntimeException("Old password is incorrect");
         }
-        user.setPassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
     }
 }

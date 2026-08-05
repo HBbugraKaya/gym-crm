@@ -3,6 +3,7 @@ package com.example.gymcrm.service;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class TrainerService {
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
     private final TrainingRepository trainingRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public CreatedAccount<Trainer> create(String firstName, String lastName, TrainingTypeName specialization) {
@@ -44,7 +46,7 @@ public class TrainerService {
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setUsername(username);
-        user.setPassword(rawPassword);
+        user.setPassword(passwordEncoder.encode(rawPassword));
         user.setActive(true);
         User savedUser = userRepository.save(user);
 

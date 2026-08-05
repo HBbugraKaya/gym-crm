@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class TraineeService {
     private final UsernameGenerator usernameGenerator;
     private final PasswordGenerator passwordGenerator;
     private final TrainingRepository trainingRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public CreatedAccount<Trainee> create(String firstName, String lastName, LocalDate dateOfBirth, String address) {
@@ -42,7 +44,7 @@ public class TraineeService {
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setUsername(username);
-        user.setPassword(rawPassword);
+        user.setPassword(passwordEncoder.encode(rawPassword));
         user.setActive(true);
         User savedUser = userRepository.save(user);
 
