@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -43,6 +44,11 @@ public class TrainerController {
         var trainer = trainerService.update(username, request.firstName(), request.lastName(), request.active());
         var user = trainer.getUser();
         return new TrainerProfileResponse(user.getUsername(), user.getFirstName(), user.getLastName(), trainer.getSpecialization().getName());
+    }
+
+    @PatchMapping("/{username}")
+    public void setActive(@PathVariable String username, @RequestBody ActiveStatusRequest request){
+        trainerService.setActive(username, request.active());
     }
 
     @GetMapping("/{username}/trainings")

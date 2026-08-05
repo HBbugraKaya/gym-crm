@@ -113,8 +113,8 @@ public class TraineeService {
         return trainerRepository.findByUser_IsActiveTrueAndIdNotIn(assignedIds);
     }
 
-    public List<Training> getTrainings(
-            String traineeUsername, LocalDate from, LocalDate to, String trainerName, TrainingTypeName trainingType) {
+    public List<Training> getTrainings(String traineeUsername, LocalDate from, LocalDate to, String trainerName, TrainingTypeName trainingType) {
+
         return trainingRepository.findByTrainee_User_UsernameIgnoreCase(traineeUsername).stream()
                 .filter(t -> from == null || !t.getTrainingDate().isBefore(from))
                 .filter(t -> to == null || !t.getTrainingDate().isAfter(to))
@@ -122,5 +122,11 @@ public class TraineeService {
                         || t.getTrainer().getUser().getUsername().equalsIgnoreCase(trainerName))
                 .filter(t -> trainingType == null || t.getTrainingType().getName() == trainingType)
                 .toList();
+    }
+
+    @Transactional
+    public void setActive(String traineeUsername, boolean active){
+        Trainee trainee = selectByUsername(traineeUsername);
+        trainee.getUser().setActive(active);
     }
 }

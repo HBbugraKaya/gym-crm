@@ -112,4 +112,9 @@ public class TraineeController {
                                 + t.getTrainer().getUser().getLastName()))
                 .toList();
     }
+
+    @PatchMapping("/{username}")
+    public void setActive(@PathVariable String username, @RequestBody ActiveStatusRequest request){
+        traineeService.setActive(username, request.active());
+    }
 }

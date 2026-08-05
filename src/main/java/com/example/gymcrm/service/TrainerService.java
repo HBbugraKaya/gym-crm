@@ -82,4 +82,10 @@ public class TrainerService {
                         || t.getTrainee().getUser().getUsername().equalsIgnoreCase(traineeName))
                 .toList();
     }
+
+    @Transactional
+    public void setActive(String trainerUsername, boolean active) {
+        Trainer trainer = selectByUsername(trainerUsername);
+        trainer.getUser().setActive(active);
+    }
 }
