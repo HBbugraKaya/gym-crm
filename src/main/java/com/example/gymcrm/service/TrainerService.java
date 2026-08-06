@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.example.gymcrm.exception.EntityNotFoundException;
+import com.example.gymcrm.exception.ValidationException;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,10 +42,10 @@ public class TrainerService {
     public CreatedAccount<Trainer> create(String firstName, String lastName, TrainingTypeName specialization) {
         TrainingType trainingType = trainingTypeRepository
                 .findByName(specialization)
-                .orElseThrow(() -> new RuntimeException("Training type not found: " + specialization));
+                .orElseThrow(() -> new EntityNotFoundException("Training type not found: " + specialization));
 
         if (traineeRepository.existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase(firstName, lastName)) {
-            throw new IllegalArgumentException("Person is already registered as a trainee");
+            throw new ValidationException("Person is already registered as a trainee");
         }
 
         String username = usernameGenerator.generateUsername(firstName, lastName);

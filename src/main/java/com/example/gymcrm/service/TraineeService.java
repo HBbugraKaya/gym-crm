@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.example.gymcrm.exception.EntityNotFoundException;
+import com.example.gymcrm.exception.ValidationException;
+
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,7 +42,7 @@ public class TraineeService {
     @Transactional
     public CreatedAccount<Trainee> create(String firstName, String lastName, LocalDate dateOfBirth, String address) {
         if (trainerRepository.existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase(firstName, lastName)) {
-            throw new IllegalArgumentException("Person is already registered as a trainer");
+            throw new ValidationException("Person is already registered as a trainer");
         }
 
         String username = usernameGenerator.generateUsername(firstName, lastName);
@@ -93,7 +95,7 @@ public class TraineeService {
         for (String trainerUsername : trainerUsernames) {
             Trainer trainer = trainerRepository
                     .findByUserUsernameIgnoreCase(trainerUsername)
-                    .orElseThrow(() -> new RuntimeException("Trainer not found"));
+                    .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
             trainers.add(trainer);
         }
 
