@@ -12,6 +12,7 @@ import com.example.gymcrm.entity.Training;
 import com.example.gymcrm.entity.TrainingType;
 import com.example.gymcrm.entity.TrainingTypeName;
 import com.example.gymcrm.entity.User;
+import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.repository.TrainingTypeRepository;
@@ -26,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class TrainerService {
 
     private final TrainerRepository trainerRepository;
+    private final TraineeRepository traineeRepository;
     private final UserRepository userRepository;
     private final TrainingTypeRepository trainingTypeRepository;
     private final UsernameGenerator usernameGenerator;
@@ -38,6 +40,10 @@ public class TrainerService {
         TrainingType trainingType = trainingTypeRepository
                 .findByName(specialization)
                 .orElseThrow(() -> new RuntimeException("Training type not found: " + specialization));
+
+        if (traineeRepository.existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase(firstName, lastName)) {
+            throw new IllegalArgumentException("Person is already registered as a trainee");
+        }
 
         String username = usernameGenerator.generateUsername(firstName, lastName);
         String rawPassword = passwordGenerator.generatePassword();

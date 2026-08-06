@@ -11,6 +11,8 @@ import com.example.gymcrm.entity.Trainer;
 public interface TrainerRepository extends JpaRepository<Trainer, Long> {
     Optional<Trainer> findByUserUsernameIgnoreCase(String username);
 
+    boolean existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase(String firstName, String lastName);
+
     List<Trainer> findByUser_IsActiveTrue();
 
     List<Trainer> findByUser_IsActiveTrueAndIdNotIn(Collection<Long> ids);

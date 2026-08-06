@@ -37,6 +37,10 @@ public class TraineeService {
 
     @Transactional
     public CreatedAccount<Trainee> create(String firstName, String lastName, LocalDate dateOfBirth, String address) {
+        if (trainerRepository.existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase(firstName, lastName)) {
+            throw new IllegalArgumentException("Person is already registered as a trainer");
+        }
+
         String username = usernameGenerator.generateUsername(firstName, lastName);
         String rawPassword = passwordGenerator.generatePassword();
 

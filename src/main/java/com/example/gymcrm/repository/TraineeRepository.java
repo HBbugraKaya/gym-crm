@@ -8,4 +8,6 @@ import com.example.gymcrm.entity.Trainee;
 
 public interface TraineeRepository extends JpaRepository<Trainee, Long> {
     Optional<Trainee> findByUserUsernameIgnoreCase(String username);
+
+    boolean existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase(String firstName, String lastName);
 }
