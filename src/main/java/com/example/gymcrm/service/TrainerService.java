@@ -3,6 +3,7 @@ package com.example.gymcrm.service;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.example.gymcrm.exception.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,7 +68,7 @@ public class TrainerService {
     public Trainer selectByUsername(String username) {
         return trainerRepository
                 .findByUserUsernameIgnoreCase(username)
-                .orElseThrow(() -> new RuntimeException("Trainer not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Trainer not found"));
     }
 
     @Transactional

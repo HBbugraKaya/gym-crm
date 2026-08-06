@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.example.gymcrm.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -64,7 +66,7 @@ public class TraineeService {
     public Trainee selectByUsername(String username) {
         return traineeRepository
                 .findByUserUsernameIgnoreCase(username)
-                .orElseThrow(() -> new RuntimeException("Trainee not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Trainee not found"));
     }
 
     @Transactional

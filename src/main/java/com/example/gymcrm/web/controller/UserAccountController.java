@@ -1,5 +1,6 @@
 package com.example.gymcrm.web.controller;
 
+import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.service.UserAccountService;
 import com.example.gymcrm.web.dto.ChangePasswordRequest;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ public class UserAccountController {
     @GetMapping("/login")
     public void login(@RequestParam String username, @RequestParam String password) {
         if(!userAccountService.matchesCredentials(username, password)) {
-            throw new RuntimeException("Invalid credentials");
+            throw new ValidationException("Invalid credentials");
         }
     }
 
