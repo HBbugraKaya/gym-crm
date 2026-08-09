@@ -1,0 +1,11 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+gymcrm:
+  security:
+    jwt:
+      # Local-only fallback. Set GYMCRM_JWT_SECRET outside local development.
+      secret: ${GYMCRM_JWT_SECRET:local-development-secret-must-be-at-least-32-characters}
+      issuer: ${GYMCRM_JWT_ISSUER:gym-crm}
