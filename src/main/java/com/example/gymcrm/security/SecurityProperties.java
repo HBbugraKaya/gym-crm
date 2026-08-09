@@ -13,7 +13,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = "gymcrm.security")
 public record SecurityProperties(@NotNull Jwt jwt, @NotNull Cors cors) {
 
-    public record Jwt(@NotBlank String secret, @NotNull Duration accessTokenTtl) {
+    public record Jwt(@NotBlank String secret, @NotBlank String issuer, @NotNull Duration accessTokenTtl) {
     }
 
     public record Cors(@NotEmpty List<@NotBlank String> allowedOrigins) {

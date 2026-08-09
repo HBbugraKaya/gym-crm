@@ -27,7 +27,7 @@ public class JwtTokenService {
                 .map(grantedAuthority -> grantedAuthority.getAuthority())
                 .toList();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer("gym-crm")
+                .issuer(securityProperties.jwt().issuer())
                 .subject(authentication.getName())
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)

@@ -37,6 +37,12 @@ public class GymUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("User has no gym profile");
         }
         return new org.springframework.security.core.userdetails.User(
-                user.getUsername(), user.getPassword(), authorities);
+                user.getUsername(),
+                user.getPassword(),
+                user.isActive(),
+                true,
+                true,
+                true,
+                authorities);
     }
 }

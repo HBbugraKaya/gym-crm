@@ -73,9 +73,10 @@ registration still returns the one-time plaintext password in the response body.
 operations verify that the authenticated username matches the requested profile. Spring Method Security
 owns the role and self-access checks.
 
-Three failed login attempts lock an account for five minutes. `POST /api/v1/auth/logout` revokes the
-current token, so it cannot be used again before it expires. Set `GYMCRM_JWT_SECRET` to a secret of at
-least 32 characters outside the `local` profile. Browser clients are allowed only from the configured
+Three failed login attempts lock an account for five minutes. Inactive users cannot authenticate.
+`POST /api/v1/auth/logout` revokes the current token, so it cannot be used again before it expires.
+Set `GYMCRM_JWT_SECRET` and `GYMCRM_JWT_ISSUER` outside the `local` profile; the secret must contain
+at least 32 characters. Browser clients are allowed only from the configured
 `gymcrm.security.cors.allowed-origins` origins.
 
 Actuator endpoints (`/actuator/**`) are public operational endpoints and do not require gym credentials.

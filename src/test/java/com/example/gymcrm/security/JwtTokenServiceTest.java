@@ -27,7 +27,7 @@ class JwtTokenServiceTest {
         JwtEncoder jwtEncoder = mock(JwtEncoder.class);
         Instant now = Instant.parse("2026-07-29T10:00:00Z");
         var properties = new SecurityProperties(
-                new SecurityProperties.Jwt("test-secret", Duration.ofMinutes(15)),
+                new SecurityProperties.Jwt("test-secret", "configured-issuer", Duration.ofMinutes(15)),
                 new SecurityProperties.Cors(List.of("http://localhost:3000")));
         var service = new JwtTokenService(jwtEncoder, properties, Clock.fixed(now, ZoneOffset.UTC));
         var authentication = UsernamePasswordAuthenticationToken.authenticated("john.smith", null,
@@ -44,7 +44,7 @@ class JwtTokenServiceTest {
         verify(jwtEncoder).encode(parameters.capture());
         assertThat(token).isEqualTo("access-token");
         assertThat(parameters.getValue().getJwsHeader().getAlgorithm()).isEqualTo(MacAlgorithm.HS256);
-        assertThat(parameters.getValue().getClaims().getClaimAsString("iss")).isEqualTo("gym-crm");
+        assertThat(parameters.getValue().getClaims().getClaimAsString("iss")).isEqualTo("configured-issuer");
         assertThat(parameters.getValue().getClaims().getSubject()).isEqualTo("john.smith");
         assertThat(parameters.getValue().getClaims().getIssuedAt()).isEqualTo(now);
         assertThat(parameters.getValue().getClaims().getExpiresAt()).isEqualTo(now.plus(Duration.ofMinutes(15)));

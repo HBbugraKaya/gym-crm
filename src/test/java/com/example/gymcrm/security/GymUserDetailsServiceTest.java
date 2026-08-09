@@ -48,6 +48,17 @@ class GymUserDetailsServiceTest {
     }
 
     @Test
+    void loadUserByUsernameDisablesInactiveUsers() {
+        User user = new User("Inactive", "User", "inactive.user", "encoded", false);
+        when(userRepository.findByUsernameIgnoreCase("inactive.user")).thenReturn(Optional.of(user));
+        when(traineeRepository.existsByUserUsernameIgnoreCase("inactive.user")).thenReturn(true);
+
+        var principal = service.loadUserByUsername("inactive.user");
+
+        assertThat(principal.isEnabled()).isFalse();
+    }
+
+    @Test
     void loadUserByUsernameRejectsUsersWithoutProfiles() {
         User user = new User("Ghost", "User", "ghost.user", "encoded", true);
         when(userRepository.findByUsernameIgnoreCase("ghost.user")).thenReturn(Optional.of(user));

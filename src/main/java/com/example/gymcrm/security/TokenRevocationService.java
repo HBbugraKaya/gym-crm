@@ -5,6 +5,7 @@ import com.example.gymcrm.repository.RevokedTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -31,5 +32,11 @@ public class TokenRevocationService {
     @Transactional(readOnly = true)
     public boolean isRevoked(String tokenId) {
         return tokenId != null && revokedTokenRepository.existsById(tokenId);
+    }
+
+    @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT1H")
+    @Transactional
+    public void cleanupExpiredTokens() {
+        revokedTokenRepository.deleteByExpiresAtLessThanEqual(clock.instant());
     }
 }

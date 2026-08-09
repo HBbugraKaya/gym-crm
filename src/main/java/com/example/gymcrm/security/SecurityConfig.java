@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -40,6 +41,7 @@ import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
+@EnableScheduling
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
     @Bean
@@ -99,12 +101,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey jwtSecretKey, RevokedTokenValidator revokedTokenValidator) {
+    JwtDecoder jwtDecoder(
+            SecretKey jwtSecretKey,
+            RevokedTokenValidator revokedTokenValidator,
+            SecurityProperties securityProperties) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
         decoder.setJwtValidator(new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefault(), revokedTokenValidator));
+                JwtValidators.createDefaultWithIssuer(securityProperties.jwt().issuer()), revokedTokenValidator));
         return decoder;
     }
 

@@ -59,6 +59,16 @@ class TokenRevocationServiceTest {
         verify(repository).existsById("token-id");
     }
 
+    @Test
+    void cleanupExpiredTokensDeletesTokensAtOrBeforeCurrentTime() {
+        RevokedTokenRepository repository = mock(RevokedTokenRepository.class);
+        var service = new TokenRevocationService(repository, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        service.cleanupExpiredTokens();
+
+        verify(repository).deleteByExpiresAtLessThanEqual(NOW);
+    }
+
     private Jwt jwt(String tokenId, Instant expiresAt) {
         return Jwt.withTokenValue("token-value")
                 .header("alg", "HS256")
