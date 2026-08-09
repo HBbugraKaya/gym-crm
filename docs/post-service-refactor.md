@@ -1,120 +1,84 @@
-# ⚠️ POST-SERVICE REFACTOR — DO NOT START UNTIL SERVICE LAYER IS DONE
+# Post-service refactor backlog
 
-> **Status:** LOCKED — finish all service methods first, then refactor in the order below.  
-> **Why this file exists:** capture improvements we agreed on so we don't forget or mix them into learning work.
-
----
-
-## Gate (must be true before touching anything here)
-
-- [ ] `TraineeService` — complete (incl. trainings list, trainer list)
-- [ ] `TrainerService` — complete (incl. trainings list)
-- [ ] `UserAccountService` — complete
-- [ ] `TrainingService` — complete (add + list criteria)
-- [ ] TrainingType DB seed exists
-
-**Until the gate passes: YAGNI. No refactors. Ship features.**
+> **Status:** Gate geçildi — service + web + security + error handling tamam.  
+> **Son güncelleme:** 2026-08-06
 
 ---
 
-## Refactor backlog (priority order)
+## Gate ✅
 
-### 1. Lombok — `@RequiredArgsConstructor` on services
+- [x] `TraineeService` — complete (incl. trainings list, trainer list)
+- [x] `TrainerService` — complete (incl. trainings list)
+- [x] `UserAccountService` — complete
+- [x] `TrainingService` — complete (add training)
+- [x] TrainingType DB seed exists
 
-**Problem:** Every service repeats the same constructor boilerplate for `final` fields.
+---
 
-**Target:** `TraineeService`, `TrainerService`, `UserAccountService`, `TrainingService`
+## Refactor backlog
 
-```java
-@Service
-@RequiredArgsConstructor
-public class TrainingService {
-    private final TrainingRepository trainingRepository;
-    private final TraineeRepository traineeRepository;
-    // ...
-}
-```
+### 1. Lombok — `@RequiredArgsConstructor` on services ✅
 
-**Remove:** hand-written constructors. Spring injects via generated constructor.
+Done on all services including `GymUserDetailsService`, `TrainingTypeService`.
 
 ---
 
 ### 2. Lombok — `@Builder` on entity creation (optional)
 
-**Problem:** 6+ setter lines when building `Training` (and similar in create flows).
-
-**Target:** `Training` entity first; evaluate `Trainee`/`Trainer` only if still noisy.
-
-```java
-// on Training:
-@Builder
-
-Training training = Training.builder()
-        .trainee(trainee)
-        .trainer(trainer)
-        .trainingName(trainingName)
-        .trainingType(type)
-        .trainingDate(trainingDate)
-        .trainingDuration(duration)
-        .build();
-```
-
-**Skip if:** setters are still readable after service layer is done.
+**Status:** skipped — setters still readable. Revisit only if create flows get noisy.
 
 ---
 
-### 3. Password encoding (BCrypt)
+### 3. Password encoding (BCrypt) ✅
 
-**Problem:** Passwords stored and compared as plain text.
-
-**Target:**
-- `pom.xml` → `spring-security-crypto` only (not full Security yet)
-- `PasswordConfig` → `BCryptPasswordEncoder` bean
+- `SecurityConfig` → `BCryptPasswordEncoder` bean
 - Encode on create: `TraineeService`, `TrainerService`
 - Match/encode on: `UserAccountService`
 
-**Do not mix with:** HTTP Basic / `SecurityConfig` — that comes with REST layer.
-
 ---
 
-### 4. Exceptions
+### 4. Exceptions ✅
 
-**Problem:** `RuntimeException("... not found")` everywhere.
-
-**Target:** `EntityNotFoundException`, `ValidationException` + `@ControllerAdvice` when web layer starts.
+- `EntityNotFoundException`, `ValidationException`
+- `web/error/ApiError` + `RestExceptionHandler` (`@RestControllerAdvice`)
+- Services and `UserAccountController` use custom exceptions (404 / 400 JSON in Postman)
 
 ---
 
 ### 5. `@Transactional` audit
 
-**Rule we settled on:** only on writes or read+write in same method.
+**Rule:** only on writes or read+write in same method.
 
-**Already done:** removed from `selectByUsername` on Trainee/Trainer.
+**Done:** removed from `selectByUsername` on Trainee/Trainer.
 
-**Re-check:** any new select-only methods don't get `@Transactional`.
-
----
-
-## Explicitly NOT doing (YAGNI)
-
-| Idea | Verdict |
-|------|---------|
-| Builder on every entity | No — only if create code stays noisy |
-| Full `spring-boot-starter-security` before REST | No |
-| Custom exception hierarchy before web layer | No |
-| DTOs / mappers before controllers | No |
+**Open:** `TraineeService.getUnassignedTrainers` — remove after `@EntityGraph` on `TraineeRepository`.
 
 ---
 
-## After refactor: sanity check
+## Still open (YAGNI order)
+
+| Item | Notes |
+|------|--------|
+| `@Valid` on DTOs | REST task — not started |
+| `@EntityGraph` on `TraineeRepository` | N+1 / lazy for `trainers` |
+| Delete cascade audit | Trainee delete + trainings + User orphan |
+| Tests | only `GymCrmApplicationTests` today |
+| Actuator / profiles | dependency in pom; no yml config |
+| OpenAPI | not started |
+
+---
+
+## Sanity check
 
 ```powershell
 .\mvnw.cmd compile
 .\mvnw.cmd test
 ```
 
-Manual smoke: create trainee → create trainer → add training → login → change password.
+Manual smoke (verified 2026-08-06):
+
+- create trainee (No Auth) → profile with Basic Auth → 404 for missing user → wrong login → 400 JSON
 
 ---
 
-*Last noted: service layer in progress — `TrainingService.create` done.*
+*Next learning focus: microservices (separate repo or second app). Return here for validation/tests/ops when ready.*

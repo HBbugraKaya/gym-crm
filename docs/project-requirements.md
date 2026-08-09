@@ -198,12 +198,12 @@ Odak: Aynı işlevlerin HTTP API’si (`@RestController`).
 |-------|---------------|-------------------|
 | 1 Domain | ✅ | Hibernate ilişkiler + Core model |
 | 2 Persistence (yml + repos) | ✅ (minimal) | Hibernate select-by-username, types |
-| 3 Generators | sırada | Core username/password |
-| 4 Service | sonra | Hibernate işlev 1–18 |
-| 5 Web + validation + errors | sonra | REST 1–17 |
-| 6 Security | sonra | Auth notları |
+| 3 Generators | ✅ | Core username/password |
+| 4 Service | ✅ | Hibernate işlev 1–18 |
+| 5 Web + errors | ✅ (validation `@Valid` sonra) | REST 1–17 |
+| 6 Security | ✅ | Auth notları — HTTP Basic + BCrypt |
 | 7 OpenAPI / logging filter | sonra | REST notes |
-| 8 Actuator / metrics / profiles | sonra | Spring Boot task |
+| 8 Actuator / metrics / profiles | sonra (dependency var) | Spring Boot task |
 
 ---
 

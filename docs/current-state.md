@@ -1,6 +1,6 @@
 # Gym CRM — Current State (`training` branch)
 
-> Yeni chat / agent için tek kaynak. Son güncelleme: **2026-07-23** (service katmanı neredeyse bitti).
+> Yeni chat / agent için tek kaynak. Son güncelleme: **2026-08-06** (security + error handling bitti).
 
 ---
 
@@ -8,7 +8,7 @@
 
 EPAM Gym CRM isterlerine uygun **Spring Boot REST API** sıfırdan öğrenerek kuruluyor.
 
-- **Kullanıcı kodu yazar** — agent mentorluk eder; istenmeden implement etme.
+- **Kullanıcı kodu yazar** — agent önce öğretir, sonra yönlendirir (bkz. `.cursor/rules/mentoring-juniors.mdc`).
 - Sıra: domain → persistence → service → web → security → ops (PDF sırası değil).
 - İster: `docs/project-requirements.md` + `docs/Task_*.pdf`.
 - `refactor` branch referans; kör kopya yok.
@@ -25,10 +25,12 @@ EPAM Gym CRM isterlerine uygun **Spring Boot REST API** sıfırdan öğrenerek k
 | Branch | `training` |
 | Java | **21** |
 | Spring Boot | **4.1.0** |
-| DB | H2 in-memory — `application.yml` sadece `name` + `jdbc:h2:mem:gymcrm` (minimal) |
+| DB | H2 in-memory — `application.yml`: port **8081**, `jdbc:h2:mem:gymcrm` |
 | JPA | Spring Data JPA |
+| Security | `spring-boot-starter-security` — HTTP Basic + BCrypt |
+| Actuator | dependency var; yapılandırma yok |
 | Build | `.\mvnw.cmd compile` |
-| Lombok | Entity’lerde |
+| Lombok | Entity’ler + service `@RequiredArgsConstructor` |
 
 ---
 
@@ -38,19 +40,32 @@ EPAM Gym CRM isterlerine uygun **Spring Boot REST API** sıfırdan öğrenerek k
 com.example.gymcrm
 ├── GymCrmApplication
 ├── config/
-│   └── TrainingTypeSeed          ApplicationRunner — enum → DB seed
-├── domain/                       User, Trainee, Trainer, Training, TrainingType, TrainingTypeName
-├── repository/                   5 JPA repo
-├── utility/                      PasswordGenerator, UsernameGenerator
-└── service/
-    ├── CreatedAccount<T>
-    ├── TraineeService
-    ├── TrainerService
-    ├── TrainingService
-    └── UserAccountService
+│   ├── SecurityConfig           BCrypt + SecurityFilterChain (HTTP Basic)
+│   ├── TrainingTypeSeed         @Order(1) — enum → DB seed
+│   └── DemoUserSeed             @Order(2) — demo.trainee / demo.trainer
+├── entity/                      User, Trainee, Trainer, Training, TrainingType, TrainingTypeName
+├── exception/
+│   ├── EntityNotFoundException  → 404
+│   └── ValidationException      → 400
+├── repository/                  5 JPA repo
+├── service/
+│   ├── GymUserDetailsService    UserDetailsService — ROLE_TRAINEE / ROLE_TRAINER
+│   ├── CreatedAccount<T>
+│   ├── TraineeService
+│   ├── TrainerService
+│   ├── TrainingService
+│   ├── TrainingTypeService
+│   └── UserAccountService
+├── utility/                     PasswordGenerator, UsernameGenerator
+└── web/
+    ├── controller/              Trainee, Trainer, Training, TrainingType, UserAccount
+    ├── dto/                     request/response record’lar
+    └── error/
+        ├── ApiError             JSON error body (status, message)
+        └── RestExceptionHandler @RestControllerAdvice
 ```
 
-**Yok:** `web/`, `security/`, custom exception, Actuator, OpenAPI, anlamlı testler.
+**Yok / sonra:** `@Valid` validation, OpenAPI, TransactionIdFilter, anlamlı testler, Actuator/profiles yapılandırması.
 
 ---
 
@@ -58,13 +73,15 @@ com.example.gymcrm
 
 | Entity | Not |
 |--------|-----|
-| User | firstName, lastName, username, password (plaintext), isActive |
+| User | firstName, lastName, username, password (**BCrypt hash**), isActive |
 | Trainee | 1-1 User; M-N Trainer; dateOfBirth, address |
 | Trainer | 1-1 User; M-1 TrainingType (specialization); M-N Trainee |
 | Training | trainee, trainer, trainingType, name, date, duration |
 | TrainingType | DB satırı; `TrainingTypeName` enum |
 
 Kimlik: **username** (id değil). Username: `First.Last` + suffix; lookup **IgnoreCase**.
+
+Kayıt kuralı: aynı firstName+lastName ile hem trainee hem trainer olamaz.
 
 ---
 
@@ -73,137 +90,108 @@ Kimlik: **username** (id değil). Username: `First.Last` + suffix; lookup **Igno
 | Repo | Methodlar |
 |------|-----------|
 | `UserRepository` | `findByUsernameIgnoreCase`, `existsByUsernameIgnoreCase` |
-| `TraineeRepository` | `findByUserUsernameIgnoreCase` |
-| `TrainerRepository` | `findByUserUsernameIgnoreCase`, `findByUser_IsActiveTrue`, `findByUser_IsActiveTrueAndIdNotIn` |
+| `TraineeRepository` | `findByUserUsernameIgnoreCase`, `existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase` |
+| `TrainerRepository` | `findByUserUsernameIgnoreCase`, `existsByUser_FirstNameIgnoreCaseAndUser_LastNameIgnoreCase`, `findByUser_IsActiveTrue`, `findByUser_IsActiveTrueAndIdNotIn` |
 | `TrainingTypeRepository` | `findByName`, `existsByName` |
-| `TrainingRepository` | `findByTrainee_User_UsernameIgnoreCase`, `findByTrainer_User_UsernameIgnoreCase` |
+| `TrainingRepository` | `findByTrainee_User_UsernameIgnoreCase` (**@EntityGraph** trainer.user, trainingType), `findByTrainer_User_UsernameIgnoreCase` (**@EntityGraph** trainee.user) |
+
+**EntityGraph eksik:** `TraineeRepository.findByUserUsernameIgnoreCase` → `trainers` (getUnassignedTrainers için).
 
 ---
 
 ## Config
 
-`TrainingTypeSeed` (`ApplicationRunner`): startup’ta her `TrainingTypeName` yoksa insert. Trainer/Training create için şart.
+| Sınıf | Rol |
+|-------|-----|
+| `TrainingTypeSeed` | Startup’ta her `TrainingTypeName` yoksa insert |
+| `DemoUserSeed` | `demo.trainee` / `demo.trainer`, password: `password` |
+| `SecurityConfig` | POST register public; GET login public; diğer `/api/**` authenticated; HTTP Basic |
 
 ---
 
-## Utility
+## Security (Postman)
 
-| Sınıf | Rol |
-|-------|-----|
-| `PasswordGenerator` | 10 char, `SecureRandom` |
-| `UsernameGenerator` | `First.Last` + numeric suffix; `existsByUsernameIgnoreCase` |
+| Senaryo | Auth | Beklenen |
+|---------|------|----------|
+| `GET /api/trainees/{username}` | Basic Auth | 200 |
+| Aynı endpoint | Auth yok | 401 |
+| Yanlış password | Basic Auth | 401 |
+| `POST /api/trainees` | **No Auth** | 200 + username/password |
+| `GET /api/trainees/nobody` | Basic Auth | 404 + `ApiError` JSON |
+| `GET /api/users/login?password=wrong` | No Auth | 400 + `ApiError` JSON |
 
-**Not:** Lowercase/`normalize` denemesi yapıldı → **geri alındı**. Şu an IgnoreCase + orijinal case.
+Demo kullanıcılar: `demo.trainee` / `demo.trainer` — password: `password`.
+
+---
+
+## Web REST
+
+| Controller | Base path | Not |
+|------------|-----------|-----|
+| `TraineeController` | `/api/trainees` | POST public; profile, trainers, trainings |
+| `TrainerController` | `/api/trainers` | POST public; profile, trainings |
+| `TrainingController` | `/api/trainings` | POST add training |
+| `TrainingTypeController` | `/api/training-types` | GET list |
+| `UserAccountController` | `/api/users` | login GET, password PUT |
 
 ---
 
 ## Service durumu
 
-### `CreatedAccount<T>`
-`(T profile, String rawPassword)` — registration cevabı.
+Tüm Hibernate işlevleri (1–18) service katmanında ✅.
 
-### `TraineeService` — tamam (EntityGraph henüz yok)
+| Service | Not |
+|---------|-----|
+| `TraineeService` | `@RequiredArgsConstructor`; duplicate trainer name check; custom exceptions |
+| `TrainerService` | `@RequiredArgsConstructor`; duplicate trainee name check |
+| `TrainingService` | `@RequiredArgsConstructor`; create returns `Training` (controller void — IDE hint OK) |
+| `UserAccountService` | BCrypt match/encode; custom exceptions |
+| `GymUserDetailsService` | username → UserDetails + role |
 
-| Method | Durum |
-|--------|--------|
-| `create(...)` | ✅ |
-| `selectByUsername` | ✅ — `@Transactional` yok |
-| `update(...)` | ✅ |
-| `deleteByUsername` | ✅ — cascade sonra |
-| `updateTrainers` | ✅ |
-| `getUnassignedTrainers` | ✅ — şimdilik `@Transactional` (lazy `trainers`); **EntityGraph sonrası tx kalkacak** |
-| `getTrainings(from,to,trainerName,type)` | ✅ — stream filtre service’te |
-
-### `TrainerService` — tamam (EntityGraph henüz yok)
-
-| Method | Durum |
-|--------|--------|
-| `create` / `select` / `update` | ✅ |
-| `getTrainings(from,to,traineeName)` | ✅ — stream filtre |
-
-Delete yok. `trainingRepository` → `private final` olsun.
-
-### Kullanıcı notları (parking lot)
-
-- [ ] **`TrainerService.getTrainings`’e sonra tekrar bak** — stream / N+1 / EntityGraph ile gözden geçirilecek (kullanıcı notu).
-- [ ] Aynı göz: `TraineeService.getTrainings` stream filtreleri.
-### `TrainingService`
-
-| Method | Durum |
-|--------|--------|
-| `create(trainee, trainer, name, type, date, duration)` | ✅ |
-
-### `UserAccountService`
-
-| Method | Durum |
-|--------|--------|
-| `matchesCredentials` | ✅ — plain equals; `@Transactional` yok |
-| `changePassword` | ✅ — `@Transactional`; managed entity, `save` yok |
+**Parking lot:** `getUnassignedTrainers` hâlâ `@Transactional` (EntityGraph sonrası kalkacak). `TrainerService.getTrainings` / `TraineeService.getTrainings` stream filtreleri — sonra gözden geçir.
 
 ---
 
-## Öğrenilen kurallar (agent + kullanıcı)
+## Tamamlanan refactor maddeleri
 
-1. **`@Transactional`:** yazma veya lazy read+sonraki erişim. Tek `find` → gerekmez.
-2. **Managed entity update:** session içinde set → commit yeter, `save` opsiyonel.
-3. **Specialization:** create’te set; update’te değiştirme.
-4. **YAGNI/KISS:** JPQL/`resolveByUsername`/stream-filtre şişirme → reddedildi. En az kod.
-5. **Username case:** IgnoreCase bırak; lowercase+normalize deneyi rollback.
-6. **Empty list OK:** olmayan trainee training listesi → `[]`, çökmez.
-7. **Agent:** kullanıcı yazsın; istenmeden kod yazma / komple method sonra değiştirme.
-
----
-
-## Hibernate ister map (özet)
-
-| # | İster | Durum |
-|---|--------|--------|
-| 1–2 | Create Trainer/Trainee | ✅ |
-| 3–4 | Credentials match | ✅ `UserAccountService` |
-| 5–6 | Select by username | ✅ |
-| 7–8 | Password change | ✅ |
-| 9–10 | Update profiles | ✅ |
-| 11–12 | Activate | ✅ `update(..., active)` |
-| 13 | Delete Trainee | ✅ (cascade netleştir) |
-| 14 | Trainee trainings + filtre | ✅ service stream |
-| 15 | Trainer trainings + filtre | ✅ service stream |
-| 16 | Add training | ✅ |
-| 17 | Unassigned trainers | ✅ |
-| 18 | Update trainers list | ✅ |
+| Madde | Durum |
+|-------|--------|
+| `@RequiredArgsConstructor` services | ✅ |
+| BCrypt passwords | ✅ |
+| HTTP Basic security | ✅ |
+| `EntityNotFoundException` + `ValidationException` + `@RestControllerAdvice` | ✅ |
+| Web REST layer | ✅ |
+| Duplicate trainee/trainer by name | ✅ |
 
 ---
 
 ## Teknik borç / sonra
 
-Tam liste: [`post-service-refactor.md`](post-service-refactor.md) — **service bitince**.
+1. `@Valid` + `spring-boot-starter-validation` on DTOs
+2. `@EntityGraph` on `TraineeRepository` + `@Transactional` audit
+3. Delete Trainee → trainings cascade + User orphan netleştir
+4. Unit / integration tests
+5. Actuator / profiles / metrics (Spring Boot task)
+6. OpenAPI / Swagger
 
-1. BCrypt / `spring-security-crypto` (plaintext şimdi)
-2. Domain exceptions + `@ControllerAdvice`
-3. Delete Trainee → trainings cascade + User orphan
-4. `@RequiredArgsConstructor` services (Lombok)
-5. Web REST + validation
-6. Security HTTP Basic
-7. Tests
-8. Actuator / profiles (Spring Boot task)
+**Kullanıcı planı:** Önce EPAM isterleri komple bitecek; microservices (~5 gün). **AI-native chat** yalnızca vakit bulunursa, öğrenme capstone — bkz. [`future-ai-native.md`](future-ai-native.md).
 
 ---
 
 ## Sıradaki adımlar
 
-1. **Şimdi:** `@EntityGraph` — `TraineeRepository.findByUserUsernameIgnoreCase` → `attributePaths = {"trainers"}`, sonra `getUnassignedTrainers`’tan `@Transactional` kaldır.
-2. **Sonra:** `TrainingRepository` list find’lere graph (`trainer.user`, `trainee.user`, `trainingType`) — getTrainings N+1 / lazy için.
-3. Parking lot: `TrainerService.getTrainings` (ve Trainee eşleniği) kullanıcı tekrar bakacak.
-4. `private final TrainingRepository` TrainerService’te.
-5. Web layer.
+1. **Microservices:** iki küçük Spring Boot app, HTTP ile konuşma (RestClient/WebClient).
+2. **Gym-crm’e dönüş (opsiyonel):** `@Valid`, EntityGraph, testler, Actuator.
 
 ### Yeni chat açılış
 
 ```
 gym-crm — docs/current-state.md oku.
-Service işlevleri bitti. Sırada EntityGraph + Transactional audit.
-Notum: TrainerService.getTrainings’e sonra tekrar bakacağım.
-Ben yazarım, sen mentor ol. YAGNI/KISS.
-```---
+Monolith REST + security + error handling bitti. Microservices'e geçiyorum.
+Ben yazarım, sen önce öğret sonra yönlendir. YAGNI/KISS.
+```
+
+---
 
 ## Komutlar
 
@@ -221,6 +209,7 @@ cd C:\Users\husey\Documents\GitHub\gym-crm
 |-------|-----|
 | `current-state.md` | Bu dosya |
 | `project-requirements.md` | İster özeti |
-| `post-service-refactor.md` | Service sonrası Lombok/BCrypt/… |
+| `post-service-refactor.md` | Refactor backlog (çoğu madde tamam) |
 | `refactor-branch-structure.md` | Eski referans |
+| `future-ai-native.md` | Proje sonu AI chat capstone vizyonu |
 | `Task_*.pdf` | Resmi görev |
