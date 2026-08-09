@@ -7,9 +7,14 @@ spring:
     open-in-view: false
 
 gymcrm:
+  workload:
+    service-url: ${GYMCRM_WORKLOAD_SERVICE_URL:http://trainer-workload-service}
+  report:
+    service-url: ${GYMCRM_REPORT_SERVICE_URL:http://trainee-report-service}
   security:
     jwt:
       secret: ${GYMCRM_JWT_SECRET}
+      issuer: ${GYMCRM_JWT_ISSUER}
       access-token-ttl: PT1H
     cors:
       allowed-origins:
@@ -41,3 +46,24 @@ logging:
     com.example.gymcrm: INFO
     org.hibernate.SQL: WARN
     org.hibernate.orm.jdbc.bind: "OFF"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      trainerWorkloadService:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+      reportService:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
