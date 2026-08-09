@@ -36,28 +36,30 @@ public class TrainerController {
         var trainer = trainerService.selectByUsername(username);
         var user = trainer.getUser();
 
-        return new TrainerProfileResponse(user.getUsername(), user.getFirstName(), user.getLastName(), trainer.getSpecialization().getName());
+        return new TrainerProfileResponse(user.getUsername(), user.getFirstName(), user.getLastName(),
+                trainer.getSpecialization().getName());
     }
 
     @PutMapping("/{username}")
     public TrainerProfileResponse update(@PathVariable String username, @RequestBody TrainerUpdateRequest request) {
         var trainer = trainerService.update(username, request.firstName(), request.lastName(), request.active());
         var user = trainer.getUser();
-        return new TrainerProfileResponse(user.getUsername(), user.getFirstName(), user.getLastName(), trainer.getSpecialization().getName());
+        return new TrainerProfileResponse(user.getUsername(), user.getFirstName(), user.getLastName(),
+                trainer.getSpecialization().getName());
     }
 
     @PatchMapping("/{username}")
-    public void setActive(@PathVariable String username, @RequestBody ActiveStatusRequest request){
+    public void setActive(@PathVariable String username, @RequestBody ActiveStatusRequest request) {
         trainerService.setActive(username, request.active());
     }
 
     @GetMapping("/{username}/trainings")
     public List<TrainerTrainingResponse> getTrainings(
-        @PathVariable String username,
-        @RequestParam(required = false) LocalDate periodFrom,
-        @RequestParam(required = false) LocalDate periodTo,
-        @RequestParam(required = false) String traineeName) {
-            var trainings = trainerService.getTrainings(username, periodFrom, periodTo, traineeName);
+            @PathVariable String username,
+            @RequestParam(required = false) LocalDate periodFrom,
+            @RequestParam(required = false) LocalDate periodTo,
+            @RequestParam(required = false) String traineeName) {
+        var trainings = trainerService.getTrainings(username, periodFrom, periodTo, traineeName);
         return trainings.stream()
                 .map(t -> new TrainerTrainingResponse(
                         t.getTrainingName(),
@@ -67,7 +69,6 @@ public class TrainerController {
                         t.getTrainee().getUser().getFirstName() + " "
                                 + t.getTrainee().getUser().getLastName()))
                 .toList();
-        }
-
+    }
 
 }

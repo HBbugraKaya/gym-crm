@@ -8,9 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.example.gymcrm.entity.Training;
 
 public interface TrainingRepository extends JpaRepository<Training, Long> {
-    @EntityGraph(attributePaths = {"trainer.user", "trainingType"})
+    @EntityGraph(attributePaths = { "trainer.user", "trainingType" })
     List<Training> findByTrainee_User_UsernameIgnoreCase(String username);
 
-    @EntityGraph(attributePaths = {"trainee.user"})
+    @EntityGraph(attributePaths = { "trainee.user", "trainingType" })
     List<Training> findByTrainer_User_UsernameIgnoreCase(String username);
 }
