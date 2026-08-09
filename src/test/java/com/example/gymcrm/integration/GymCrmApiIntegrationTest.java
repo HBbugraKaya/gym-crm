@@ -1,6 +1,7 @@
 package com.example.gymcrm.integration;
 
 import com.example.gymcrm.web.dto.RegistrationResponse;
+import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -22,9 +25,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +40,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
+@TestPropertySource(properties = {
+        "eureka.client.enabled=false",
+        "spring.cloud.discovery.enabled=false"
+})
 class GymCrmApiIntegrationTest {
     private static final AtomicLong UNIQUE_SEQUENCE = new AtomicLong(System.nanoTime());
 
@@ -45,6 +55,12 @@ class GymCrmApiIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @MockitoBean
+    private TrainerWorkloadClient trainerWorkloadClient;
+
+    @MockitoBean
+    private TraineeDeletionReportClient traineeDeletionReportClient;
 
     private JdbcTemplate jdbcTemplate;
 
@@ -168,16 +184,19 @@ class GymCrmApiIntegrationTest {
                                 "durationMinutes", 55))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/trainees/{username}/trainings", trainee.username())
-                        .header(HttpHeaders.AUTHORIZATION, traineeAuthorization)
-                        .queryParam("periodFrom", trainingDate.minusDays(1).toString())
-                        .queryParam("periodTo", trainingDate.plusDays(1).toString())
-                        .queryParam("trainerName", "Coach" + suffix)
-                        .queryParam("trainingType", "YOGA"))
+        MvcResult traineeTrainings = mockMvc.perform(
+                        get("/api/v1/trainees/{username}/trainings", trainee.username())
+                                .header(HttpHeaders.AUTHORIZATION, traineeAuthorization)
+                                .queryParam("periodFrom", trainingDate.minusDays(1).toString())
+                                .queryParam("periodTo", trainingDate.plusDays(1).toString())
+                                .queryParam("trainerName", "Coach" + suffix)
+                                .queryParam("trainingType", "YOGA"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].trainingName").value(trainingName))
                 .andExpect(jsonPath("$[0].trainingType").value("YOGA"))
-                .andExpect(jsonPath("$[0].durationMinutes").value(55));
+                .andExpect(jsonPath("$[0].durationMinutes").value(55))
+                .andReturn();
+        long trainingId = jsonTree(traineeTrainings).get(0).path("trainingId").asLong();
 
         mockMvc.perform(get("/api/v1/trainers/{username}/trainings", trainer.username())
                         .header(HttpHeaders.AUTHORIZATION, trainerAuthorization)
@@ -195,10 +214,25 @@ class GymCrmApiIntegrationTest {
         assertThat(trainingTypes.findValuesAsText("name"))
                 .containsExactlyInAnyOrder("FITNESS", "YOGA", "CARDIO", "STRENGTH", "STRETCHING");
 
-        assertThat(countTrainings(trainingName)).isEqualTo(1);
+        mockMvc.perform(delete("/api/v1/trainings/{trainingId}", trainingId)
+                        .header(HttpHeaders.AUTHORIZATION, trainerAuthorization))
+                .andExpect(status().isNoContent());
+
+        verify(trainerWorkloadClient, times(1)).synchronize(
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.action() == TrainerWorkloadRequest.WorkloadAction.ADD));
+        verify(trainerWorkloadClient, times(1)).synchronize(
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.action() == TrainerWorkloadRequest.WorkloadAction.DELETE));
+
+        assertThat(countTrainings(trainingName)).isZero();
         mockMvc.perform(delete("/api/v1/trainees/{username}", trainee.username())
                         .header(HttpHeaders.AUTHORIZATION, traineeAuthorization))
                 .andExpect(status().isOk());
+
+        verify(traineeDeletionReportClient, times(1)).report(
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.traineeUsername().equals(trainee.username())));
 
         assertThat(countTrainees(trainee.username())).isZero();
         assertThat(countTrainings(trainingName)).isZero();
@@ -229,6 +263,29 @@ class GymCrmApiIntegrationTest {
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/v1/trainees/{username}", logoutUser.username())
                         .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void inactiveUsersCannotLoginWhileActiveUsersCan() throws Exception {
+        String suffix = uniqueSuffix();
+        RegistrationResponse trainee = registerTrainee("Status" + suffix, "Trainee");
+
+        String activeAuthorization = bearerAuth(trainee);
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("username", trainee.username(), "password", trainee.password()))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/trainees/{username}/status", trainee.username())
+                        .header(HttpHeaders.AUTHORIZATION, activeAuthorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("active", false))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("username", trainee.username(), "password", trainee.password()))))
                 .andExpect(status().isUnauthorized());
     }
 

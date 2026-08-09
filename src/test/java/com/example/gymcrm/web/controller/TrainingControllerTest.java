@@ -33,4 +33,12 @@ class TrainingControllerTest {
         verify(trainingService).addTraining(
                 "john.smith", "alice.coach", "Morning yoga", date, 60);
     }
+
+    @Test
+    void deleteTrainingDelegatesTrainingId() {
+        var response = controller.deleteTraining(42L);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(trainingService).deleteTraining(42L);
+    }
 }

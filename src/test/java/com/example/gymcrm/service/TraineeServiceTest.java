@@ -6,16 +6,22 @@ import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
+import com.example.gymcrm.exception.DownstreamServiceException;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
+import com.example.gymcrm.integration.TraineeDeletionReportClient;
+import com.example.gymcrm.integration.TrainerWorkloadClient;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
+import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,6 +34,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +63,12 @@ class TraineeServiceTest {
 
     @Mock
     private GymCrmMetrics metrics;
+
+    @Mock
+    private TraineeDeletionReportClient traineeDeletionReportClient;
+
+    @Mock
+    private TrainerWorkloadClient trainerWorkloadClient;
 
     @InjectMocks
     private TraineeService service;
@@ -101,13 +117,79 @@ class TraineeServiceTest {
     }
 
     @Test
-    void deleteDelegatesToRepository() {
+    void deleteWithoutTrainingsDeletesTraineeAndReportsDeletion() {
         Trainee trainee = trainee("Delete.Me", true);
         when(traineeRepository.findByUserUsernameIgnoreCase("Delete.Me")).thenReturn(Optional.of(trainee));
+        when(trainingRepository.findTraineeTrainings(
+                "Delete.Me", null, null, null, null)).thenReturn(List.of());
 
         service.deleteByUsername("Delete.Me");
 
+        verify(trainerWorkloadClient, never()).synchronize(any(TrainerWorkloadRequest.class));
         verify(traineeRepository).delete(trainee);
+        verify(traineeDeletionReportClient).report(any());
+    }
+
+    @Test
+    void deleteSynchronizesEveryTrainingBeforeDeletingTrainee() {
+        Trainee trainee = trainee("Delete.Me", true);
+        Trainer activeTrainer = trainer("Active.Coach", 12L, true);
+        Trainer inactiveTrainer = trainer("Inactive.Coach", 13L, false);
+        Training firstTraining = training(
+                trainee, activeTrainer, LocalDate.of(2026, 7, 2), 45);
+        Training secondTraining = training(
+                trainee, inactiveTrainer, LocalDate.of(2026, 8, 5), 60);
+        when(traineeRepository.findByUserUsernameIgnoreCase("Delete.Me")).thenReturn(Optional.of(trainee));
+        when(trainingRepository.findTraineeTrainings(
+                "Delete.Me", null, null, null, null))
+                .thenReturn(List.of(firstTraining, secondTraining));
+
+        service.deleteByUsername("Delete.Me");
+
+        ArgumentCaptor<TrainerWorkloadRequest> requests =
+                ArgumentCaptor.forClass(TrainerWorkloadRequest.class);
+        verify(trainerWorkloadClient, times(2)).synchronize(requests.capture());
+        assertThat(requests.getAllValues()).containsExactly(
+                new TrainerWorkloadRequest(
+                        "Active.Coach",
+                        "Coach",
+                        "One",
+                        true,
+                        LocalDate.of(2026, 7, 2),
+                        45,
+                        TrainerWorkloadRequest.WorkloadAction.DELETE),
+                new TrainerWorkloadRequest(
+                        "Inactive.Coach",
+                        "Coach",
+                        "One",
+                        false,
+                        LocalDate.of(2026, 8, 5),
+                        60,
+                        TrainerWorkloadRequest.WorkloadAction.DELETE));
+
+        InOrder order = inOrder(trainerWorkloadClient, traineeRepository, traineeDeletionReportClient);
+        order.verify(trainerWorkloadClient, times(2)).synchronize(any(TrainerWorkloadRequest.class));
+        order.verify(traineeRepository).delete(trainee);
+        order.verify(traineeDeletionReportClient).report(any());
+    }
+
+    @Test
+    void deleteDoesNotDeleteTraineeWhenWorkloadSynchronizationFails() {
+        Trainee trainee = trainee("Delete.Me", true);
+        Training training = training(trainee, trainer("Coach.One", 12L));
+        when(traineeRepository.findByUserUsernameIgnoreCase("Delete.Me")).thenReturn(Optional.of(trainee));
+        when(trainingRepository.findTraineeTrainings(
+                "Delete.Me", null, null, null, null)).thenReturn(List.of(training));
+        doThrow(new DownstreamServiceException(
+                "Workload service is unavailable", new IllegalStateException()))
+                .when(trainerWorkloadClient)
+                .synchronize(any(TrainerWorkloadRequest.class));
+
+        assertThatThrownBy(() -> service.deleteByUsername("Delete.Me"))
+                .isInstanceOf(DownstreamServiceException.class);
+
+        verify(traineeRepository, never()).delete(any(Trainee.class));
+        verify(traineeDeletionReportClient, never()).report(any());
     }
 
     @Test
@@ -168,15 +250,23 @@ class TraineeServiceTest {
     }
 
     private Trainer trainer(String username, long id) {
-        Trainer trainer = new Trainer(new User("Coach", "One", username, "secret1234", true),
+        return trainer(username, id, true);
+    }
+
+    private Trainer trainer(String username, long id, boolean active) {
+        Trainer trainer = new Trainer(new User("Coach", "One", username, "secret1234", active),
                 new TrainingType(TrainingTypeName.YOGA));
         setId(trainer, id);
         return trainer;
     }
 
     private Training training(Trainee trainee, Trainer trainer) {
+        return training(trainee, trainer, LocalDate.of(2026, 7, 2), 45);
+    }
+
+    private Training training(Trainee trainee, Trainer trainer, LocalDate date, int durationMinutes) {
         return new Training(trainee, trainer, "Yoga", trainer.getSpecialization(),
-                LocalDate.of(2026, 7, 2), 45);
+                date, durationMinutes);
     }
 
     private void setId(Object entity, long id) {

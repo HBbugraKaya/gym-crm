@@ -7,6 +7,7 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
+import com.example.gymcrm.integration.TrainerWorkloadClient;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class TrainingServiceTest {
@@ -41,6 +43,9 @@ class TrainingServiceTest {
 
     @Mock
     private GymCrmMetrics metrics;
+
+    @Mock
+    private TrainerWorkloadClient trainerWorkloadClient;
 
     @InjectMocks
     private TrainingService service;
@@ -68,6 +73,7 @@ class TrainingServiceTest {
         assertThat(trainee.getTrainers()).containsExactly(trainer);
         assertThat(trainer.getTrainees()).containsExactly(trainee);
         verify(metrics).recordTrainingCreated();
+        verify(trainerWorkloadClient).synchronize(any());
     }
 
     @Test
@@ -90,6 +96,65 @@ class TrainingServiceTest {
         assertThatThrownBy(() -> service.addTraining(
                 "Missing.Runner", "Coach.One", "Yoga", LocalDate.of(2026, 7, 2), 45))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void deleteTrainingSynchronizesDeleteAndRemovesTrainingForOwner() {
+        Trainer trainer = trainer("Coach.One");
+        Trainee trainee = trainee("Runner.One");
+        Training training = new Training(
+                trainee,
+                trainer,
+                "Morning yoga",
+                trainer.getSpecialization(),
+                LocalDate.of(2026, 7, 2),
+                45);
+        when(trainingRepository.findById(42L)).thenReturn(Optional.of(training));
+        org.springframework.security.core.Authentication authentication =
+                org.mockito.Mockito.mock(org.springframework.security.core.Authentication.class);
+        when(authentication.getName()).thenReturn("coach.one");
+        org.springframework.security.core.context.SecurityContext context =
+                org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+
+        try {
+            service.deleteTraining(42L);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+
+        verify(trainingRepository).delete(training);
+        verify(trainerWorkloadClient).synchronize(any());
+    }
+
+    @Test
+    void deleteTrainingRejectsTrainingOwnedByAnotherTrainer() {
+        Trainer trainer = trainer("Coach.One");
+        Training training = new Training(
+                trainee("Runner.One"),
+                trainer,
+                "Morning yoga",
+                trainer.getSpecialization(),
+                LocalDate.of(2026, 7, 2),
+                45);
+        when(trainingRepository.findById(42L)).thenReturn(Optional.of(training));
+        org.springframework.security.core.Authentication authentication =
+                org.mockito.Mockito.mock(org.springframework.security.core.Authentication.class);
+        when(authentication.getName()).thenReturn("Other.Coach");
+        org.springframework.security.core.context.SecurityContext context =
+                org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+
+        try {
+            assertThatThrownBy(() -> service.deleteTraining(42L))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+
+        verifyNoInteractions(trainerWorkloadClient);
     }
 
     private Trainee trainee(String username) {

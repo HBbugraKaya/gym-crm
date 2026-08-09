@@ -9,10 +9,14 @@ import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
+import com.example.gymcrm.integration.TraineeDeletionReportClient;
+import com.example.gymcrm.integration.TrainerWorkloadClient;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
+import com.example.gymcrm.web.dto.TraineeDeletionReportRequest;
+import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,6 +37,8 @@ public class TraineeService {
     private final SecurePasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
     private final GymCrmMetrics metrics;
+    private final TraineeDeletionReportClient traineeDeletionReportClient;
+    private final TrainerWorkloadClient trainerWorkloadClient;
 
     @Transactional
     public CreatedAccount<Trainee> create(
@@ -67,7 +73,18 @@ public class TraineeService {
     @PreAuthorize("hasRole('TRAINEE') and #username.equalsIgnoreCase(authentication.name)")
     public void deleteByUsername(String username) {
         Trainee trainee = find(username);
+        List<Training> trainings = trainingRepository.findTraineeTrainings(
+                trainee.getUsername(), null, null, null, null);
+        for (Training training : trainings) {
+            trainerWorkloadClient.synchronize(workloadRequest(training));
+        }
+
         traineeRepository.delete(trainee);
+        traineeDeletionReportClient.report(new TraineeDeletionReportRequest(
+                trainee.getUsername(),
+                trainee.getFirstName(),
+                trainee.getLastName(),
+                trainee.isActive()));
     }
 
     @PreAuthorize("hasRole('TRAINEE') and #traineeUsername.equalsIgnoreCase(authentication.name)")
@@ -113,5 +130,17 @@ public class TraineeService {
 
     private String normalizeName(String name) {
         return name == null || name.isBlank() ? null : name.trim();
+    }
+
+    private TrainerWorkloadRequest workloadRequest(Training training) {
+        Trainer trainer = training.getTrainer();
+        return new TrainerWorkloadRequest(
+                trainer.getUsername(),
+                trainer.getFirstName(),
+                trainer.getLastName(),
+                trainer.isActive(),
+                training.getDate(),
+                training.getDurationMinutes(),
+                TrainerWorkloadRequest.WorkloadAction.DELETE);
     }
 }

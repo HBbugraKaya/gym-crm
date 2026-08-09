@@ -15,7 +15,9 @@ public record ApiError(
 ) {
     public static ApiError of(int status, String message, String path) {
         HttpStatus httpStatus = HttpStatus.resolve(status);
-        String error = httpStatus == null ? "HTTP Error" : httpStatus.getReasonPhrase();
+        String error = status >= 500
+                ? "Request Failed"
+                : httpStatus == null ? "HTTP Error" : httpStatus.getReasonPhrase();
         return new ApiError(Instant.now(), status, error, message, path, MDC.get("transactionId"));
     }
 }

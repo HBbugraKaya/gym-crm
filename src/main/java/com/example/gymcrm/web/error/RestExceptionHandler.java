@@ -1,9 +1,12 @@
 package com.example.gymcrm.web.error;
 
 import com.example.gymcrm.exception.EntityNotFoundException;
+import com.example.gymcrm.exception.DownstreamServiceException;
 import com.example.gymcrm.exception.ValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class RestExceptionHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RestExceptionHandler.class);
 
     @ExceptionHandler(EntityNotFoundException.class)
     ResponseEntity<ApiError> handleNotFound(EntityNotFoundException exception, HttpServletRequest request) {
@@ -39,6 +43,13 @@ public class RestExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, message, request);
     }
 
+    @ExceptionHandler(DownstreamServiceException.class)
+    ResponseEntity<ApiError> handleDownstreamFailure(
+            DownstreamServiceException exception,
+            HttpServletRequest request) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiError> handleStatus(ResponseStatusException exception, HttpServletRequest request) {
         int status = exception.getStatusCode().value();
@@ -53,7 +64,11 @@ public class RestExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> handleUnexpected(Exception exception, HttpServletRequest request) {
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error", request);
+        LOGGER.error(
+                "Unhandled REST request failure path={} failureType={}",
+                request.getRequestURI(),
+                exception.getClass().getSimpleName());
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Request could not be processed", request);
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String message, HttpServletRequest request) {

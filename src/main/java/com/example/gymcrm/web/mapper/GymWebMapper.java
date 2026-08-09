@@ -85,6 +85,7 @@ public class GymWebMapper {
 
     private TraineeTrainingResponse toTraineeTraining(Training training) {
         return new TraineeTrainingResponse(
+                training.getId(),
                 training.getName(),
                 training.getDate(),
                 training.getTrainingType().getName(),
@@ -94,6 +95,7 @@ public class GymWebMapper {
 
     private TrainerTrainingResponse toTrainerTraining(Training training) {
         return new TrainerTrainingResponse(
+                training.getId(),
                 training.getName(),
                 training.getDate(),
                 training.getTrainingType().getName(),
