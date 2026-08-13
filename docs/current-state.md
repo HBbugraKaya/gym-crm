@@ -162,6 +162,7 @@ Tüm Hibernate işlevleri (1–18) service katmanında ✅.
 | `EntityNotFoundException` + `ValidationException` + `@RestControllerAdvice` | ✅ |
 | Web REST layer | ✅ |
 | Duplicate trainee/trainer by name | ✅ |
+| `TransactionIdFilter` + REST call logging | ✅ |
 
 ---
 
@@ -173,6 +174,7 @@ Tüm Hibernate işlevleri (1–18) service katmanında ✅.
 4. Unit / integration tests
 5. Actuator / profiles / metrics (Spring Boot task)
 6. OpenAPI / Swagger
+
 
 **Kullanıcı planı:** Önce EPAM isterleri komple bitecek; microservices (~5 gün). **AI-native chat** yalnızca vakit bulunursa, öğrenme capstone — bkz. [`future-ai-native.md`](future-ai-native.md).
 
