@@ -6,3 +6,9 @@ spring:
     name: gym-crm
   datasource:
     url: jdbc:h2:mem:gymcrm
+
+logging:
+  file:
+    name: logs/gym-crm.log
+  pattern:
+    level: "%5p [txId: %X{transactionId}]"
