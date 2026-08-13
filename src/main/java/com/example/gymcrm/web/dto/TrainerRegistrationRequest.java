@@ -2,6 +2,9 @@ package com.example.gymcrm.web.dto;
 
 import com.example.gymcrm.entity.TrainingTypeName;
 
-public record TrainerRegistrationRequest(String firstName, String lastName, TrainingTypeName specialization) {
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record TrainerRegistrationRequest(@NotBlank String firstName, @NotBlank String lastName, @NotNull TrainingTypeName specialization) {
 
 }

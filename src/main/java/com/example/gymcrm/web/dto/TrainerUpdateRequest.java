@@ -1,5 +1,7 @@
 package com.example.gymcrm.web.dto;
 
-public record TrainerUpdateRequest(String firstName, String lastName, boolean active) {
+import jakarta.validation.constraints.NotBlank;
+
+public record TrainerUpdateRequest(@NotBlank String firstName, @NotBlank String lastName, boolean active) {
 
 }

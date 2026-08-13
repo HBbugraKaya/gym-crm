@@ -1,5 +1,7 @@
 package com.example.gymcrm.web.dto;
 
-public record ChangePasswordRequest(String oldPassword, String newPassword) {
+import jakarta.validation.constraints.NotBlank;
+
+public record ChangePasswordRequest(@NotBlank String oldPassword, @NotBlank String newPassword) {
 
 }
