@@ -1,8 +1,10 @@
 package com.example.gymcrm.web.error;
+
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -21,5 +23,17 @@ public class RestExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError(400, ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .orElse("Request validation failed");
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(400, message));
     }
 }

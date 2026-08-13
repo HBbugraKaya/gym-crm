@@ -3,6 +3,8 @@ package com.example.gymcrm.web.controller;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.service.UserAccountService;
 import com.example.gymcrm.web.dto.ChangePasswordRequest;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,13 +15,13 @@ public class UserAccountController {
     private final UserAccountService userAccountService;
 
     @PutMapping("/{username}/password")
-    public void changePassword(@PathVariable String username, @RequestBody ChangePasswordRequest request){
+    public void changePassword(@PathVariable String username, @Valid @RequestBody ChangePasswordRequest request) {
         userAccountService.changePassword(username, request.oldPassword(), request.newPassword());
     }
 
     @GetMapping("/login")
     public void login(@RequestParam String username, @RequestParam String password) {
-        if(!userAccountService.matchesCredentials(username, password)) {
+        if (!userAccountService.matchesCredentials(username, password)) {
             throw new ValidationException("Invalid credentials");
         }
     }

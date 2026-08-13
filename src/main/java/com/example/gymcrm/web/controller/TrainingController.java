@@ -2,6 +2,8 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.service.TrainingService;
 import com.example.gymcrm.web.dto.AddTrainingRequest;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,7 +18,7 @@ public class TrainingController {
     private final TrainingService trainingService;
 
     @PostMapping
-    void addTraining(@RequestBody AddTrainingRequest request) {
+    void addTraining(@Valid @RequestBody AddTrainingRequest request) {
         trainingService.create(
                 request.traineeUsername(),
                 request.trainerUsername(),

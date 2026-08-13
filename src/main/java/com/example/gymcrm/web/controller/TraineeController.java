@@ -2,6 +2,9 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.entity.TrainingTypeName;
 import com.example.gymcrm.web.dto.*;
+
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.*;
 
 import com.example.gymcrm.service.TraineeService;
@@ -18,7 +21,7 @@ public class TraineeController {
     private final TraineeService traineeService;
 
     @PostMapping
-    public RegistrationResponse register(@RequestBody TraineeRegistrationRequest request) {
+    public RegistrationResponse register(@Valid @RequestBody TraineeRegistrationRequest request) {
         var created = traineeService.create(
                 request.firstName(), request.lastName(), request.dateOfBirth(), request.address());
         return new RegistrationResponse(created.profile().getUser().getUsername(), created.rawPassword());
@@ -38,7 +41,7 @@ public class TraineeController {
     }
 
     @PutMapping("/{username}")
-    public TraineeProfileResponse update(@PathVariable String username, @RequestBody TraineeUpdateRequest request) {
+    public TraineeProfileResponse update(@PathVariable String username, @Valid @RequestBody TraineeUpdateRequest request) {
         var trainee = traineeService.update(
                 username,
                 request.firstName(),
@@ -77,7 +80,7 @@ public class TraineeController {
 
     @PutMapping("/{username}/trainers")
     public List<TrainerSummaryResponse> updateTrainers(
-            @PathVariable String username, @RequestBody TrainerAssignmentsRequest request) {
+            @PathVariable String username, @Valid @RequestBody TrainerAssignmentsRequest request) {
 
         var trainee = traineeService.updateTrainers(username, request.trainerUsernames());
 

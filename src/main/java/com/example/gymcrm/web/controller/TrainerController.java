@@ -2,6 +2,8 @@ package com.example.gymcrm.web.controller;
 
 import com.example.gymcrm.web.dto.*;
 
+import jakarta.validation.Valid;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -26,7 +28,7 @@ public class TrainerController {
     private final TrainerService trainerService;
 
     @PostMapping
-    public RegistrationResponse register(@RequestBody TrainerRegistrationRequest request) {
+    public RegistrationResponse register(@Valid @RequestBody TrainerRegistrationRequest request) {
         var created = trainerService.create(request.firstName(), request.lastName(), request.specialization());
         return new RegistrationResponse(created.profile().getUser().getUsername(), created.rawPassword());
     }
@@ -41,7 +43,7 @@ public class TrainerController {
     }
 
     @PutMapping("/{username}")
-    public TrainerProfileResponse update(@PathVariable String username, @RequestBody TrainerUpdateRequest request) {
+    public TrainerProfileResponse update(@PathVariable String username, @Valid @RequestBody TrainerUpdateRequest request) {
         var trainer = trainerService.update(username, request.firstName(), request.lastName(), request.active());
         var user = trainer.getUser();
         return new TrainerProfileResponse(user.getUsername(), user.getFirstName(), user.getLastName(),
