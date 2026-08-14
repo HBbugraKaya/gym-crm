@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,6 +39,7 @@ public class TraineeService {
     private final PasswordGenerator passwordGenerator;
     private final TrainingRepository trainingRepository;
     private final PasswordEncoder passwordEncoder;
+    private final MeterRegistry meterRegistry;
 
     @Transactional
     public CreatedAccount<Trainee> create(String firstName, String lastName, LocalDate dateOfBirth, String address) {
@@ -61,6 +63,8 @@ public class TraineeService {
         trainee.setAddress(address);
         trainee.setUser(savedUser);
         Trainee savedTrainee = traineeRepository.save(trainee);
+
+        meterRegistry.counter("gymcrm.trainee.registrations").increment();
 
         return new CreatedAccount<>(savedTrainee, rawPassword);
     }
