@@ -40,7 +40,7 @@ public class TransactionIdFilter extends OncePerRequestFilter {
         } finally {
             long duration = System.currentTimeMillis() - startTime;
             log.info("HTTP OUT <- Status: [{}] Duration: [{}ms]", response.getStatus(), duration);
-            MDC.clear();
+            MDC.remove("transactionId");
         }
     }
 }
