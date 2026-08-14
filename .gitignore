@@ -38,3 +38,5 @@ postman/globals/workspace.globals.yaml
 logs/
 *.log
 
+data/
+
