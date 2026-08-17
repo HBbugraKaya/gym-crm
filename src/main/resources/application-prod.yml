@@ -2,6 +2,11 @@ spring:
   config:
     activate:
       on-profile: prod
+  activemq:
+    in-memory: false
+    broker-url: ${ACTIVEMQ_BROKER_URL}
+    user: ${ACTIVEMQ_USER:}
+    password: ${ACTIVEMQ_PASSWORD:}
   datasource:
     url: ${GYMCRM_PROD_DB_URL}
     username: ${GYMCRM_PROD_DB_USERNAME}

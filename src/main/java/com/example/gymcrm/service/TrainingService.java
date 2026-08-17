@@ -4,7 +4,7 @@ import com.example.gymcrm.domain.Trainee;
 import com.example.gymcrm.domain.Trainer;
 import com.example.gymcrm.domain.Training;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.integration.TrainerWorkloadClient;
+import com.example.gymcrm.integration.jms.TrainerWorkloadPublisher;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
@@ -27,7 +27,7 @@ public class TrainingService {
     private final TraineeRepository traineeRepository;
     private final TrainerRepository trainerRepository;
     private final GymCrmMetrics metrics;
-    private final TrainerWorkloadClient trainerWorkloadClient;
+    private final TrainerWorkloadPublisher trainerWorkloadPublisher;
 
     @Transactional
     @PreAuthorize("hasRole('TRAINER') and #trainerUsername.equalsIgnoreCase(authentication.name)")
@@ -53,7 +53,7 @@ public class TrainingService {
 
         Training saved = trainingRepository.save(training);
         metrics.recordTrainingCreated();
-        trainerWorkloadClient.synchronize(workloadRequest(saved, TrainerWorkloadRequest.WorkloadAction.ADD));
+        trainerWorkloadPublisher.publish(workloadRequest(saved, TrainerWorkloadRequest.WorkloadAction.ADD));
         return saved;
     }
 
@@ -65,7 +65,7 @@ public class TrainingService {
         verifyTrainerOwnsTraining(training);
 
         trainingRepository.delete(training);
-        trainerWorkloadClient.synchronize(workloadRequest(training, TrainerWorkloadRequest.WorkloadAction.DELETE));
+        trainerWorkloadPublisher.publish(workloadRequest(training, TrainerWorkloadRequest.WorkloadAction.DELETE));
     }
 
     private TrainerWorkloadRequest workloadRequest(

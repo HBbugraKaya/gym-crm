@@ -7,10 +7,10 @@ spring:
     open-in-view: false
 
 gymcrm:
-  workload:
-    service-url: ${GYMCRM_WORKLOAD_SERVICE_URL:http://trainer-workload-service}
-  report:
-    service-url: ${GYMCRM_REPORT_SERVICE_URL:http://trainee-report-service}
+  jms:
+    queues:
+      trainer-workload: gym.trainer.workload
+      trainee-deletion-report: gym.trainee.deletion-report
   security:
     jwt:
       secret: ${GYMCRM_JWT_SECRET}
@@ -53,17 +53,3 @@ eureka:
       defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      trainerWorkloadService:
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
-      reportService:
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s

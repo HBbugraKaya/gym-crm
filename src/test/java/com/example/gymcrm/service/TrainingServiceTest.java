@@ -7,7 +7,7 @@ import com.example.gymcrm.domain.TrainingType;
 import com.example.gymcrm.domain.TrainingTypeName;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.exception.EntityNotFoundException;
-import com.example.gymcrm.integration.TrainerWorkloadClient;
+import com.example.gymcrm.integration.jms.TrainerWorkloadPublisher;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
@@ -45,7 +45,7 @@ class TrainingServiceTest {
     private GymCrmMetrics metrics;
 
     @Mock
-    private TrainerWorkloadClient trainerWorkloadClient;
+    private TrainerWorkloadPublisher trainerWorkloadPublisher;
 
     @InjectMocks
     private TrainingService service;
@@ -73,7 +73,7 @@ class TrainingServiceTest {
         assertThat(trainee.getTrainers()).containsExactly(trainer);
         assertThat(trainer.getTrainees()).containsExactly(trainee);
         verify(metrics).recordTrainingCreated();
-        verify(trainerWorkloadClient).synchronize(any());
+        verify(trainerWorkloadPublisher).publish(any());
     }
 
     @Test
@@ -125,7 +125,7 @@ class TrainingServiceTest {
         }
 
         verify(trainingRepository).delete(training);
-        verify(trainerWorkloadClient).synchronize(any());
+        verify(trainerWorkloadPublisher).publish(any());
     }
 
     @Test
@@ -154,7 +154,7 @@ class TrainingServiceTest {
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }
 
-        verifyNoInteractions(trainerWorkloadClient);
+        verifyNoInteractions(trainerWorkloadPublisher);
     }
 
     private Trainee trainee(String username) {

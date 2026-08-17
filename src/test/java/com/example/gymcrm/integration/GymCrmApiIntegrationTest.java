@@ -2,6 +2,8 @@ package com.example.gymcrm.integration;
 
 import com.example.gymcrm.web.dto.RegistrationResponse;
 import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
+import com.example.gymcrm.integration.jms.TraineeDeletionReportPublisher;
+import com.example.gymcrm.integration.jms.TrainerWorkloadPublisher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,10 +59,10 @@ class GymCrmApiIntegrationTest {
     private DataSource dataSource;
 
     @MockitoBean
-    private TrainerWorkloadClient trainerWorkloadClient;
+    private TrainerWorkloadPublisher trainerWorkloadPublisher;
 
     @MockitoBean
-    private TraineeDeletionReportClient traineeDeletionReportClient;
+    private TraineeDeletionReportPublisher traineeDeletionReportPublisher;
 
     private JdbcTemplate jdbcTemplate;
 
@@ -218,10 +220,10 @@ class GymCrmApiIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, trainerAuthorization))
                 .andExpect(status().isNoContent());
 
-        verify(trainerWorkloadClient, times(1)).synchronize(
+        verify(trainerWorkloadPublisher, times(1)).publish(
                 org.mockito.ArgumentMatchers.argThat(request ->
                         request.action() == TrainerWorkloadRequest.WorkloadAction.ADD));
-        verify(trainerWorkloadClient, times(1)).synchronize(
+        verify(trainerWorkloadPublisher, times(1)).publish(
                 org.mockito.ArgumentMatchers.argThat(request ->
                         request.action() == TrainerWorkloadRequest.WorkloadAction.DELETE));
 
@@ -230,7 +232,7 @@ class GymCrmApiIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, traineeAuthorization))
                 .andExpect(status().isOk());
 
-        verify(traineeDeletionReportClient, times(1)).report(
+        verify(traineeDeletionReportPublisher, times(1)).publish(
                 org.mockito.ArgumentMatchers.argThat(request ->
                         request.traineeUsername().equals(trainee.username())));
 

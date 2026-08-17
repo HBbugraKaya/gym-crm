@@ -9,8 +9,8 @@ import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.exception.ValidationException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
-import com.example.gymcrm.integration.TraineeDeletionReportClient;
-import com.example.gymcrm.integration.TrainerWorkloadClient;
+import com.example.gymcrm.integration.jms.TraineeDeletionReportPublisher;
+import com.example.gymcrm.integration.jms.TrainerWorkloadPublisher;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
@@ -37,8 +37,8 @@ public class TraineeService {
     private final SecurePasswordGenerator passwordGenerator;
     private final PasswordEncoder passwordEncoder;
     private final GymCrmMetrics metrics;
-    private final TraineeDeletionReportClient traineeDeletionReportClient;
-    private final TrainerWorkloadClient trainerWorkloadClient;
+    private final TraineeDeletionReportPublisher traineeDeletionReportPublisher;
+    private final TrainerWorkloadPublisher trainerWorkloadPublisher;
 
     @Transactional
     public CreatedAccount<Trainee> create(
@@ -76,11 +76,11 @@ public class TraineeService {
         List<Training> trainings = trainingRepository.findTraineeTrainings(
                 trainee.getUsername(), null, null, null, null);
         for (Training training : trainings) {
-            trainerWorkloadClient.synchronize(workloadRequest(training));
+            trainerWorkloadPublisher.publish(workloadRequest(training));
         }
 
         traineeRepository.delete(trainee);
-        traineeDeletionReportClient.report(new TraineeDeletionReportRequest(
+        traineeDeletionReportPublisher.publish(new TraineeDeletionReportRequest(
                 trainee.getUsername(),
                 trainee.getFirstName(),
                 trainee.getLastName(),

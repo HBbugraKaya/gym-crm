@@ -10,8 +10,8 @@ import com.example.gymcrm.exception.DownstreamServiceException;
 import com.example.gymcrm.exception.EntityNotFoundException;
 import com.example.gymcrm.generator.SecurePasswordGenerator;
 import com.example.gymcrm.generator.UniqueUsernameGenerator;
-import com.example.gymcrm.integration.TraineeDeletionReportClient;
-import com.example.gymcrm.integration.TrainerWorkloadClient;
+import com.example.gymcrm.integration.jms.TraineeDeletionReportPublisher;
+import com.example.gymcrm.integration.jms.TrainerWorkloadPublisher;
 import com.example.gymcrm.observability.GymCrmMetrics;
 import com.example.gymcrm.repository.TraineeRepository;
 import com.example.gymcrm.repository.TrainerRepository;
@@ -65,10 +65,10 @@ class TraineeServiceTest {
     private GymCrmMetrics metrics;
 
     @Mock
-    private TraineeDeletionReportClient traineeDeletionReportClient;
+    private TraineeDeletionReportPublisher traineeDeletionReportPublisher;
 
     @Mock
-    private TrainerWorkloadClient trainerWorkloadClient;
+    private TrainerWorkloadPublisher trainerWorkloadPublisher;
 
     @InjectMocks
     private TraineeService service;
@@ -125,9 +125,9 @@ class TraineeServiceTest {
 
         service.deleteByUsername("Delete.Me");
 
-        verify(trainerWorkloadClient, never()).synchronize(any(TrainerWorkloadRequest.class));
+        verify(trainerWorkloadPublisher, never()).publish(any(TrainerWorkloadRequest.class));
         verify(traineeRepository).delete(trainee);
-        verify(traineeDeletionReportClient).report(any());
+        verify(traineeDeletionReportPublisher).publish(any());
     }
 
     @Test
@@ -148,7 +148,7 @@ class TraineeServiceTest {
 
         ArgumentCaptor<TrainerWorkloadRequest> requests =
                 ArgumentCaptor.forClass(TrainerWorkloadRequest.class);
-        verify(trainerWorkloadClient, times(2)).synchronize(requests.capture());
+        verify(trainerWorkloadPublisher, times(2)).publish(requests.capture());
         assertThat(requests.getAllValues()).containsExactly(
                 new TrainerWorkloadRequest(
                         "Active.Coach",
@@ -167,10 +167,10 @@ class TraineeServiceTest {
                         60,
                         TrainerWorkloadRequest.WorkloadAction.DELETE));
 
-        InOrder order = inOrder(trainerWorkloadClient, traineeRepository, traineeDeletionReportClient);
-        order.verify(trainerWorkloadClient, times(2)).synchronize(any(TrainerWorkloadRequest.class));
+        InOrder order = inOrder(trainerWorkloadPublisher, traineeRepository, traineeDeletionReportPublisher);
+        order.verify(trainerWorkloadPublisher, times(2)).publish(any(TrainerWorkloadRequest.class));
         order.verify(traineeRepository).delete(trainee);
-        order.verify(traineeDeletionReportClient).report(any());
+        order.verify(traineeDeletionReportPublisher).publish(any());
     }
 
     @Test
@@ -182,14 +182,14 @@ class TraineeServiceTest {
                 "Delete.Me", null, null, null, null)).thenReturn(List.of(training));
         doThrow(new DownstreamServiceException(
                 "Workload service is unavailable", new IllegalStateException()))
-                .when(trainerWorkloadClient)
-                .synchronize(any(TrainerWorkloadRequest.class));
+                .when(trainerWorkloadPublisher)
+                .publish(any(TrainerWorkloadRequest.class));
 
         assertThatThrownBy(() -> service.deleteByUsername("Delete.Me"))
                 .isInstanceOf(DownstreamServiceException.class);
 
         verify(traineeRepository, never()).delete(any(Trainee.class));
-        verify(traineeDeletionReportClient, never()).report(any());
+        verify(traineeDeletionReportPublisher, never()).publish(any());
     }
 
     @Test
