@@ -6,8 +6,16 @@ spring:
     name: trainer-workload-service
   profiles:
     default: local
+  jms:
+    listener:
+      concurrency: 1
+      max-concurrency: 3
 
 gymcrm:
+  jms:
+    queues:
+      trainer-workload: gym.trainer.workload
+      trainer-workload-dlq: gym.trainer.workload.dlq
   security:
     jwt:
       secret: ${GYMCRM_JWT_SECRET}

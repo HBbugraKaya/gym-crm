@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  activemq:
+    in-memory: false
+    broker-url: ${ACTIVEMQ_BROKER_URL:tcp://localhost:61616}
+    user: ${ACTIVEMQ_USER:}
+    password: ${ACTIVEMQ_PASSWORD:}
+
+logging:
+  level:
+    com.example.gymcrm.workload: DEBUG
