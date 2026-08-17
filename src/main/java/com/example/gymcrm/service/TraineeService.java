@@ -113,7 +113,6 @@ public class TraineeService {
         traineeRepository.delete(trainee);
     }
 
-    @Transactional
     public List<Trainer> getUnassignedTrainers(String traineeUsername) {
         Trainee trainee = selectByUsername(traineeUsername);
 
