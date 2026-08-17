@@ -1,7 +1,7 @@
 # Gym CRM microservices
 
-The final microservices task adds a separate trainer workload service and a
-separate Eureka discovery service.
+The trainer workload and trainee report services receive write events over
+ActiveMQ. Query endpoints stay on REST.
 
 ## Services
 
@@ -12,29 +12,41 @@ separate Eureka discovery service.
 | `trainer-workload-service` | 8091 | In-memory monthly trainer workload summaries |
 | `trainee-report-service` | 8092 | In-memory trainee deletion report receiver |
 
-The main application sends an `ADD` or `DELETE` workload event after a
-training is created or cancelled. The call uses:
+The main application publishes an `ADD` or `DELETE` workload event after a
+training is created or cancelled, and a trainee deletion report after a
+trainee profile is removed. Both writes use Spring JMS (`JmsTemplate` /
+`@JmsListener`) with JSON text messages:
 
-- Eureka service discovery (`trainer-workload-service`)
-- the caller's JWT as a Bearer token
-- the `X-Transaction-Id` header
-- a Resilience4j circuit breaker
-- a short HTTP connect/read timeout
+- queue `gym.trainer.workload`
+- queue `gym.trainee.deletion-report`
+- JMS property `transactionId` (same value as `X-Transaction-Id`)
+- logical Jackson type ids `TrainerWorkloadRequest` and
+  `TraineeDeletionReportRequest` (not fully qualified class names)
 
-If the workload service is unavailable or times out, the main API returns a
-structured `503 Service Unavailable` response instead of reporting a false
-success.
+If the broker is unavailable, the main API returns a structured
+`503 Service Unavailable` response. If a consumer is down, the message stays
+on the queue until a consumer starts.
+
+Invalid messages (missing required fields, or a business rule such as deleting
+more workload than exists) are moved to a dead-letter queue:
+
+- `gym.trainer.workload.dlq`
+- `gym.trainee.deletion-report.dlq`
+
+Unexpected listener failures are redelivered up to three times, then ActiveMQ
+sends them to its default DLQ. Consumers use a queue (not a topic) with
+listener concurrency `1` to `3` and queue prefetch `1`, so extra instances compete
+for messages. The in-memory stores are still per process: GET results reflect
+the instance that processed those messages.
 
 Training cancellation is exposed by the main service as
 `DELETE /api/v1/trainings/{trainingId}`. The training ID is included in the
 trainee and trainer training-list responses.
 
-Trainee profile deletion invokes the report service through
-`POST /api/v1/trainee-deletion-reports`. The report payload contains only the
-trainee identity and active status; passwords are never sent downstream.
-The report receiver accepts deletion events only from a JWT with the
-`ROLE_TRAINEE` authority, and its PII-containing GET endpoint is not exposed
-to ordinary application roles.
+The report payload contains only the trainee identity and active status;
+passwords are never sent downstream. The report receiver still accepts REST
+deletion events only from a JWT with the `ROLE_TRAINEE` authority, and its
+PII-containing GET endpoint is not exposed to ordinary application roles.
 
 ## Workload service endpoints
 
@@ -46,7 +58,10 @@ GET  /api/v1/trainer-workloads/{trainerUsername}?year=2026&month=8
 GET  /api/v1/trainer-workloads/{trainerUsername}/summary
 ```
 
-The POST body contains:
+POST remains for Swagger or manual testing. The main CRM application does not
+call it; gym-crm publishes to `gym.trainer.workload` instead.
+
+The message / POST body contains:
 
 ```json
 {
@@ -60,8 +75,23 @@ The POST body contains:
 }
 ```
 
-`action` is `ADD` or `DELETE`. The service keeps a concurrent in-memory
+`actionType` is `ADD` or `DELETE`. The service keeps a concurrent in-memory
 structure grouped by trainer, year, and month.
+
+## ActiveMQ profiles
+
+Queue names are shared. Broker connection is per profile:
+
+- `local`: embedded in-memory broker (`vm://localhost`), so a single service
+  starts without Docker. Inter-service messaging needs a shared broker; use
+  the `dev` profile, or override `spring.activemq.in-memory=false` and
+  `spring.activemq.broker-url`.
+- `dev`: `ACTIVEMQ_BROKER_URL` (default `tcp://localhost:61616`)
+- `stg` / `prod`: required `ACTIVEMQ_BROKER_URL`, optional
+  `ACTIVEMQ_USER` / `ACTIVEMQ_PASSWORD`
+
+Do not log broker passwords, JWTs, or message payloads that include names
+beyond the username identifier already used in application logs.
 
 All services use the same `GYMCRM_JWT_SECRET` and `GYMCRM_JWT_ISSUER`
 configuration contract. The default `local` profile provides only a
@@ -102,7 +132,7 @@ $env:GYMCRM_JWT_SECRET = "local-development-secret-must-be-at-least-32-character
 ..\mvnw.cmd spring-boot:run
 ```
 
-The main application's workload service URL defaults to the Eureka service
-name `http://trainer-workload-service`. For a direct local endpoint without
-discovery, set `GYMCRM_WORKLOAD_SERVICE_URL` to a reachable service URL and
-adjust the client configuration accordingly.
+The `local` profile starts an embedded broker inside each process. To let
+gym-crm, workload, and report share one broker, run ActiveMQ on `61616` and
+start the services with the `dev` profile (or set `ACTIVEMQ_BROKER_URL` and
+`spring.activemq.in-memory=false`).

@@ -17,6 +17,9 @@ The application uses a small layered design and lets Spring Boot own framework c
 There are no custom authentication principals, repository implementations or framework-level error wrappers.
 Flyway and Docker are intentionally out of scope.
 
+Trainer workload writes and trainee deletion reports go to ActiveMQ. Query APIs stay on REST.
+See [`docs/microservices.md`](docs/microservices.md) for queues, DLQ, profiles and how to run the services.
+
 ## Build and run
 
 Requirements:
