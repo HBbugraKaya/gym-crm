@@ -6,8 +6,16 @@ spring:
     name: trainee-report-service
   profiles:
     default: local
+  jms:
+    listener:
+      concurrency: 1
+      max-concurrency: 3
 
 gymcrm:
+  jms:
+    queues:
+      trainee-deletion-report: gym.trainee.deletion-report
+      trainee-deletion-report-dlq: gym.trainee.deletion-report.dlq
   security:
     jwt:
       secret: ${GYMCRM_JWT_SECRET}
