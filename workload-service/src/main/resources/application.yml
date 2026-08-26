@@ -6,6 +6,9 @@ spring:
     name: trainer-workload-service
   profiles:
     default: local
+  data:
+    mongodb:
+      auto-index-creation: true
   jms:
     listener:
       concurrency: 1

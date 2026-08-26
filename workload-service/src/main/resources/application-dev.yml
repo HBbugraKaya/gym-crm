@@ -7,6 +7,9 @@ spring:
     broker-url: ${ACTIVEMQ_BROKER_URL:tcp://localhost:61616}
     user: ${ACTIVEMQ_USER:}
     password: ${ACTIVEMQ_PASSWORD:}
+  data:
+    mongodb:
+      uri: ${GYMCRM_MONGODB_URI:mongodb://localhost:27017/gymcrm_workload}
 
 logging:
   level:

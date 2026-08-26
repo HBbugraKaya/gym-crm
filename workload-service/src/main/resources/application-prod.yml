@@ -7,3 +7,6 @@ spring:
     broker-url: ${ACTIVEMQ_BROKER_URL}
     user: ${ACTIVEMQ_USER:}
     password: ${ACTIVEMQ_PASSWORD:}
+  data:
+    mongodb:
+      uri: ${GYMCRM_PROD_MONGODB_URI}
