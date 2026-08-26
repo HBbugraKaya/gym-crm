@@ -9,7 +9,7 @@ ActiveMQ. Query endpoints stay on REST.
 |---|---:|---|
 | `spring-boot-gym-crm` | 8080 | Main REST API and source of training changes |
 | `gym-crm-discovery-service` | 8761 | Eureka service registry |
-| `trainer-workload-service` | 8091 | In-memory monthly trainer workload summaries |
+| `trainer-workload-service` | 8091 | MongoDB-backed monthly trainer workload summaries |
 | `trainee-report-service` | 8092 | In-memory trainee deletion report receiver |
 
 The main application publishes an `ADD` or `DELETE` workload event after a
@@ -36,8 +36,11 @@ more workload than exists) are moved to a dead-letter queue:
 Unexpected listener failures are redelivered up to three times, then ActiveMQ
 sends them to its default DLQ. Consumers use a queue (not a topic) with
 listener concurrency `1` to `3` and queue prefetch `1`, so extra instances compete
-for messages. The in-memory stores are still per process: GET results reflect
-the instance that processed those messages.
+for messages. The workload service stores each trainer summary in MongoDB, in
+the `trainer_workloads` collection. Documents contain the trainer identity and
+status, followed by nested year and month summaries. A compound index covers
+`trainerFirstName` and `trainerLastName`; trainer username is also indexed for
+the event lookup.
 
 Training cancellation is exposed by the main service as
 `DELETE /api/v1/trainings/{trainingId}`. The training ID is included in the
@@ -75,8 +78,9 @@ The message / POST body contains:
 }
 ```
 
-`actionType` is `ADD` or `DELETE`. The service keeps a concurrent in-memory
-structure grouped by trainer, year, and month.
+`actionType` is `ADD` or `DELETE`. The service reads the trainer document by
+username, updates the matching year/month duration, and saves the document
+back to MongoDB.
 
 ## ActiveMQ profiles
 
@@ -96,6 +100,19 @@ beyond the username identifier already used in application logs.
 All services use the same `GYMCRM_JWT_SECRET` and `GYMCRM_JWT_ISSUER`
 configuration contract. The default `local` profile provides only a
 development secret; set both variables for dev, staging, and production.
+
+## MongoDB profiles
+
+The workload service uses the following MongoDB configuration:
+
+- `local` and `dev`: `GYMCRM_MONGODB_URI` (default
+  `mongodb://localhost:27017/gymcrm_workload`)
+- `stg`: required `GYMCRM_STG_MONGODB_URI`
+- `prod`: required `GYMCRM_PROD_MONGODB_URI`
+
+MongoDB index creation is enabled on startup. The local workload service
+therefore requires a MongoDB instance on `localhost:27017`, unless
+`GYMCRM_MONGODB_URI` is set to another database.
 
 Swagger UI:
 
@@ -118,6 +135,7 @@ cd discovery-service
 cd workload-service
 $env:GYMCRM_JWT_ISSUER = "gym-crm"
 $env:GYMCRM_JWT_SECRET = "local-development-secret-must-be-at-least-32-characters"
+$env:GYMCRM_MONGODB_URI = "mongodb://localhost:27017/gymcrm_workload"
 ..\mvnw.cmd spring-boot:run
 
 # terminal 3
