@@ -6,9 +6,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
-import com.example.gymcrm.dto.ActionType;
-import com.example.gymcrm.dto.TrainerWorkloadRequest;
 import com.example.gymcrm.entity.TrainerWorkload;
+import com.example.gymcrm.web.dto.ActionType;
+import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 
 @Service
 public class TrainerWorkloadService {
@@ -42,4 +42,14 @@ public class TrainerWorkloadService {
             months.put(month, newDuration);
         }
     }
+
+    public int getMonthlyDuration(String username, int year, int month) {
+        TrainerWorkload workload = workloadStorage.get(username.toLowerCase());
+        if(workload == null) return 0;
+
+        Map<Integer, Integer> months = workload.getYears().get(year);
+        if(months == null) return 0;
+
+        return months.getOrDefault(month, 0);
+    } 
 }

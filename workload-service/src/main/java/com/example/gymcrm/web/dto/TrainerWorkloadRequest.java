@@ -1,4 +1,4 @@
-package com.example.gymcrm.dto;
+package com.example.gymcrm.web.dto;
 
 import java.time.LocalDate;
 
