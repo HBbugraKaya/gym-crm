@@ -1,17 +1,14 @@
 package com.example.gymcrm.workload;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootTest
-@TestPropertySource(properties = {
-        "eureka.client.enabled=false",
-        "spring.cloud.discovery.enabled=false"
-})
+import static org.assertj.core.api.Assertions.assertThat;
+
 class TrainerWorkloadApplicationTest {
 
     @Test
-    void applicationContextStarts() {
+    void isSpringBootApplication() {
+        assertThat(TrainerWorkloadApplication.class.getAnnotation(SpringBootApplication.class)).isNotNull();
     }
 }

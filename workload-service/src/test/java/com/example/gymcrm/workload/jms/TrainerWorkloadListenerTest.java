@@ -22,9 +22,11 @@ import org.springframework.jms.core.MessagePostProcessor;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -64,6 +66,19 @@ class TrainerWorkloadListenerTest {
 
         verify(trainerWorkloadService).apply(request);
         verifyNoInteractions(jmsTemplate);
+    }
+
+    @Test
+    void transactionIdIsAvailableDuringProcessingAndClearedAfterward() {
+        TrainerWorkloadRequest request = validRequest();
+        doAnswer(invocation -> {
+            assertThat(MDC.get(TrainerWorkloadListener.TRANSACTION_ID_PROPERTY)).isEqualTo("tx-mdc");
+            return null;
+        }).when(trainerWorkloadService).apply(request);
+
+        listener.onMessage(request, "tx-mdc");
+
+        assertThat(MDC.get(TrainerWorkloadListener.TRANSACTION_ID_PROPERTY)).isNull();
     }
 
     @Test
