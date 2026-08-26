@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @OpenAPIDefinition(info = @Info(
         title = "Trainer Workload Service API",
         version = "1.0",
-        description = "In-memory monthly trainer workload summary service"
+        description = "MongoDB-backed monthly trainer workload summary service"
 ))
 @SecurityScheme(
         name = "bearerAuth",

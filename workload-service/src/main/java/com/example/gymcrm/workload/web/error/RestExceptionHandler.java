@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -47,6 +48,17 @@ public class RestExceptionHandler {
                 .findFirst()
                 .orElse("Request validation failed");
         return error(HttpStatus.BAD_REQUEST, message, request);
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    ResponseEntity<ApiError> handlePersistenceFailure(
+            DataAccessException exception,
+            HttpServletRequest request) {
+        LOGGER.error(
+                "Workload persistence failure path={} failureType={}",
+                request.getRequestURI(),
+                exception.getClass().getSimpleName());
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "Workload storage is unavailable", request);
     }
 
     @ExceptionHandler(Exception.class)

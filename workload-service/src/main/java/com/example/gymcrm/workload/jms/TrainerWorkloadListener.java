@@ -37,6 +37,10 @@ public class TrainerWorkloadListener {
         if (transactionId != null) {
             MDC.put(TRANSACTION_ID_PROPERTY, transactionId);
         }
+        LOGGER.info(
+                "Started workload transaction trainerUsername={} transactionIdPresent={}",
+                request.trainerUsername(),
+                transactionId != null);
         try {
             Set<ConstraintViolation<TrainerWorkloadRequest>> violations = validator.validate(request);
             if (!violations.isEmpty()) {
@@ -50,7 +54,7 @@ public class TrainerWorkloadListener {
 
             trainerWorkloadService.apply(request);
             LOGGER.info(
-                    "Processed workload message action={} trainerUsername={}",
+                    "Completed workload transaction action={} trainerUsername={}",
                     request.action(),
                     request.trainerUsername());
         } catch (ValidationException | EntityNotFoundException exception) {
@@ -60,6 +64,9 @@ public class TrainerWorkloadListener {
                     exception.getMessage());
             sendToDeadLetterQueue(request, transactionId);
         } finally {
+            LOGGER.info(
+                    "Finished workload transaction trainerUsername={}",
+                    request.trainerUsername());
             MDC.remove(TRANSACTION_ID_PROPERTY);
         }
     }

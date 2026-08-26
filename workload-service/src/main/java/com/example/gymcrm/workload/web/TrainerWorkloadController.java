@@ -45,7 +45,7 @@ public class TrainerWorkloadController {
     }
 
     @GetMapping("/{trainerUsername}/summary")
-    @Operation(summary = "Get the complete in-memory workload summary")
+    @Operation(summary = "Get the complete trainer workload summary")
     public TrainerWorkloadSummary findSummary(@PathVariable String trainerUsername) {
         return trainerWorkloadService.findSummary(trainerUsername);
     }
