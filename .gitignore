@@ -5,7 +5,17 @@ target/
 *.log
 *.class
 .DS_Store
+Thumbs.db
 hs_err_pid*
+
+# Runtime logs, including rotated archives
+logs/
+
+# Local Cursor agent skills
+.agents/
+
+# Spring Initializr generated docs
+HELP.md
 
 # Local Postman workspace metadata
 .postman/
