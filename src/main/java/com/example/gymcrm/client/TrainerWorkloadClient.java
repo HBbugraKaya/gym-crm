@@ -1,13 +1,11 @@
 package com.example.gymcrm.client;
 
-import java.util.UUID;
-
-import org.slf4j.MDC;
 import org.springframework.jms.core.JmsClient;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import com.example.gymcrm.config.JmsConfig;
+import com.example.gymcrm.utility.MdcUtils;
 import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 
 import lombok.RequiredArgsConstructor;
@@ -21,17 +19,14 @@ public class TrainerWorkloadClient {
     private final JmsClient jmsClient;
 
     public void updateWorkload(TrainerWorkloadRequest request) {
-        String transactionId = MDC.get("transactionId");
-        if (transactionId == null || transactionId.isBlank()) {
-            transactionId = UUID.randomUUID().toString();
-        }
+        String transactionId = MdcUtils.getOrGenerateTransactionId();
 
         log.info("Sending workload message to ActiveMQ queue: {} for trainer: {}",
                 JmsConfig.TRAINER_WORKLOAD_QUEUE, request.trainerUsername());
 
         jmsClient.destination(JmsConfig.TRAINER_WORKLOAD_QUEUE)
                 .send(MessageBuilder.withPayload(request)
-                        .setHeader("X-Transaction-Id", transactionId)
+                        .setHeader(MdcUtils.TRANSACTION_ID, transactionId)
                         .build());
     }
 }
