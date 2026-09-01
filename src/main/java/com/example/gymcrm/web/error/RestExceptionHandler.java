@@ -72,6 +72,11 @@ public class RestExceptionHandler {
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String message, HttpServletRequest request) {
+        LOGGER.debug(
+                "REST error status={} path={} reasonPresent={}",
+                status.value(),
+                request.getRequestURI(),
+                message != null);
         return ResponseEntity.status(status).body(ApiError.of(status.value(), message, request.getRequestURI()));
     }
 

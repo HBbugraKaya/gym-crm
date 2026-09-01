@@ -48,9 +48,12 @@ public class TrainerWorkloadService {
             throw exception;
         }
 
-        LOGGER.debug(
-                "Completed workload operation action={} trainerUsername={} month={} durationMinutes={}",
+        LOGGER.info(
+                "Completed workload operation action={} trainerUsername={}",
                 request.action(),
+                request.trainerUsername());
+        LOGGER.debug(
+                "Workload month updated trainerUsername={} month={} durationMinutes={}",
                 request.trainerUsername(),
                 request.trainingDate().withDayOfMonth(1),
                 request.trainingDurationMinutes());

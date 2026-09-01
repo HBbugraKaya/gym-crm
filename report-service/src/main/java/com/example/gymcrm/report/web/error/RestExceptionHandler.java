@@ -52,6 +52,11 @@ public class RestExceptionHandler {
             HttpStatus status,
             String message,
             HttpServletRequest request) {
+        LOGGER.debug(
+                "Report REST error status={} path={} reasonPresent={}",
+                status.value(),
+                request.getRequestURI(),
+                message != null);
         return ResponseEntity.status(status)
                 .body(ApiError.of(status.value(), message, request.getRequestURI()));
     }

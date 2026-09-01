@@ -129,4 +129,35 @@ local/dev and `INFO` in stg/prod.
 
 The suite prefers plain JUnit/Mockito unit tests for business rules, controllers, validation, mapping and filters.
 Spring Boot/H2/MockMvc integration tests cover framework wiring, cross-profile authorization and the complete
-assignment/training/cascade lifecycle. JaCoCo fails the build below 80% line coverage.
+assignment/training/cascade lifecycle. Cucumber component tests cover each HTTP API in isolation; Cucumber
+integration tests cover ActiveMQ contracts between gym-crm, the workload service and the report service.
+JaCoCo fails the build below 80% line coverage.
+
+Run every test in a module:
+
+```powershell
+./mvnw.cmd test
+./mvnw.cmd -f workload-service/pom.xml test
+./mvnw.cmd -f report-service/pom.xml test
+```
+
+Run all Cucumber scenarios in a module:
+
+```powershell
+./mvnw.cmd test -Dtest=CucumberTest
+./mvnw.cmd -f workload-service/pom.xml test -Dtest=CucumberTest
+./mvnw.cmd -f report-service/pom.xml test -Dtest=CucumberTest
+```
+
+Select a tag (`@login`, `@trainings`, `@permissions`, `@trainer-workloads`, `@reports`, `@component`, `@integration`, `@nfr`):
+
+```powershell
+./mvnw.cmd test -Dtest=CucumberTest "-Dcucumber.filter.tags=@login"
+./mvnw.cmd -f workload-service/pom.xml test -Dtest=CucumberTest "-Dcucumber.filter.tags=@trainer-workloads"
+```
+
+Run a single JUnit test class (one endpoint/area):
+
+```powershell
+./mvnw.cmd test -Dtest=AuthenticationControllerTest
+```

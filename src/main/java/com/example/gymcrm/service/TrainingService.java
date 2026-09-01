@@ -11,6 +11,8 @@ import com.example.gymcrm.repository.TrainerRepository;
 import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -23,6 +25,8 @@ import java.time.LocalDate;
 @Service
 @RequiredArgsConstructor
 public class TrainingService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrainingService.class);
+
     private final TrainingRepository trainingRepository;
     private final TraineeRepository traineeRepository;
     private final TrainerRepository trainerRepository;
@@ -53,6 +57,12 @@ public class TrainingService {
 
         Training saved = trainingRepository.save(training);
         metrics.recordTrainingCreated();
+        LOGGER.info(
+                "Training created trainingId={} trainerUsername={} traineeUsername={} durationMinutes={}",
+                saved.getId(),
+                trainerUsername,
+                traineeUsername,
+                durationMinutes);
         trainerWorkloadPublisher.publish(workloadRequest(saved, TrainerWorkloadRequest.WorkloadAction.ADD));
         return saved;
     }
@@ -65,6 +75,7 @@ public class TrainingService {
         verifyTrainerOwnsTraining(training);
 
         trainingRepository.delete(training);
+        LOGGER.info("Training cancelled trainingId={} trainerUsername={}", trainingId, authenticationName());
         trainerWorkloadPublisher.publish(workloadRequest(training, TrainerWorkloadRequest.WorkloadAction.DELETE));
     }
 
@@ -88,5 +99,10 @@ public class TrainingService {
                 || !training.getTrainer().getUsername().equalsIgnoreCase(authentication.getName())) {
             throw new AccessDeniedException("Training belongs to another trainer");
         }
+    }
+
+    private String authenticationName() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication == null ? "anonymous" : authentication.getName();
     }
 }

@@ -35,6 +35,10 @@ public class TraineeDeletionReportListener {
         if (transactionId != null) {
             MDC.put(TRANSACTION_ID_PROPERTY, transactionId);
         }
+        LOGGER.info(
+                "Started trainee deletion report transaction traineeUsername={} transactionIdPresent={}",
+                request.traineeUsername(),
+                transactionId != null);
         try {
             Set<ConstraintViolation<TraineeDeletionReportRequest>> violations = validator.validate(request);
             if (!violations.isEmpty()) {

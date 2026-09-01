@@ -3,6 +3,8 @@ package com.example.gymcrm.security;
 import com.example.gymcrm.domain.User;
 import com.example.gymcrm.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,6 +21,7 @@ import java.time.Instant;
 @Service
 @RequiredArgsConstructor
 public class LoginService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoginService.class);
     private static final int MAX_FAILED_ATTEMPTS = 3;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(5);
 
@@ -29,9 +32,11 @@ public class LoginService {
 
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public String login(String username, String password) {
+        LOGGER.debug("Login attempt username={}", username);
         User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
         Instant now = clock.instant();
         if (user != null && user.isLockedAt(now)) {
+            LOGGER.warn("Login rejected because the account is locked username={}", username);
             throw new ResponseStatusException(HttpStatus.LOCKED, "Account is temporarily locked");
         }
         if (user != null) {
@@ -44,11 +49,13 @@ public class LoginService {
             if (user != null) {
                 user.resetFailedLoginAttempts();
             }
+            LOGGER.info("Login succeeded username={}", username);
             return jwtTokenService.createAccessToken(authentication);
         } catch (AuthenticationException exception) {
             if (user != null) {
                 user.recordFailedLogin(now, MAX_FAILED_ATTEMPTS, LOCK_DURATION);
             }
+            LOGGER.warn("Login failed username={}", username);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
         }
     }

@@ -18,6 +18,8 @@ import com.example.gymcrm.repository.TrainingRepository;
 import com.example.gymcrm.web.dto.TraineeDeletionReportRequest;
 import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TraineeService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TraineeService.class);
+
     private final TraineeRepository traineeRepository;
     private final TrainerRepository trainerRepository;
     private final TrainingRepository trainingRepository;
@@ -52,6 +56,7 @@ public class TraineeService {
                 address);
         Trainee saved = traineeRepository.save(trainee);
         metrics.recordTraineeRegistration();
+        LOGGER.info("Trainee registered username={}", username);
         return new CreatedAccount<>(saved, rawPassword);
     }
 
@@ -85,6 +90,7 @@ public class TraineeService {
                 trainee.getFirstName(),
                 trainee.getLastName(),
                 trainee.isActive()));
+        LOGGER.info("Trainee deleted username={}", username);
     }
 
     @PreAuthorize("hasRole('TRAINEE') and #traineeUsername.equalsIgnoreCase(authentication.name)")
