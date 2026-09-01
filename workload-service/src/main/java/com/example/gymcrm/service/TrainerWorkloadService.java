@@ -1,55 +1,60 @@
 package com.example.gymcrm.service;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
 import com.example.gymcrm.entity.TrainerWorkload;
+import com.example.gymcrm.repository.TrainerWorkloadRepository;
 import com.example.gymcrm.web.dto.ActionType;
 import com.example.gymcrm.web.dto.TrainerWorkloadRequest;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class TrainerWorkloadService {
-    private final Map<String, TrainerWorkload> workloadStorage = new ConcurrentHashMap<>();
+
+    private final TrainerWorkloadRepository repository;
 
     public void processWorkload(TrainerWorkloadRequest request) {
-        TrainerWorkload workload = workloadStorage.computeIfAbsent(
-            request.trainerUsername().toLowerCase(), username -> new TrainerWorkload(
-                                                            request.trainerUsername(),
-                                                            request.trainerFirstName(),
-                                                            request.trainerLastName(),
-                                                            request.isActive(),
-                                                            new HashMap<>()
-                                                            )
-        );
+        log.info("Processing workload for trainer: {}, action: {}, duration: {} min",
+                request.trainerUsername(), request.actionType(), request.trainingDuration());
 
-        workload.setFirstName(request.trainerFirstName());
-        workload.setLastName(request.trainerLastName());
-        workload.setActive(request.isActive());
+        int delta = request.actionType() == ActionType.ADD
+                ? request.trainingDuration()
+                : -request.trainingDuration();
 
-        int year = request.trainingDate().getYear();
-        int month = request.trainingDate().getMonthValue();
-
-        Map<Integer, Integer> months = workload.getYears().computeIfAbsent(year, y -> new HashMap<>());
-        int currentDuration = months.getOrDefault(month, 0);
-
-        if (request.actionType() == ActionType.ADD) {
-            months.put(month, currentDuration + request.trainingDuration());
-        } else if (request.actionType() == ActionType.DELETE) {
-            int newDuration = Math.max(0, currentDuration - request.trainingDuration());
-            months.put(month, newDuration);
+        Optional<TrainerWorkload> found = repository.findById(request.trainerUsername());
+        if (found.isEmpty() && delta < 0) {
+            log.warn("Cannot deduct duration. Trainer not found: {}", request.trainerUsername());
+            return;
         }
+
+        TrainerWorkload current = found.orElseGet(() -> new TrainerWorkload(
+                request.trainerUsername(),
+                request.trainerFirstName(),
+                request.trainerLastName(),
+                request.isActive(),
+                List.of()));
+
+        repository.save(current.adjust(
+                request.trainerFirstName(),
+                request.trainerLastName(),
+                request.isActive(),
+                request.trainingDate().getYear(),
+                request.trainingDate().getMonthValue(),
+                delta));
+
+        log.info("Successfully updated workload in MongoDB for trainer: {}", request.trainerUsername());
     }
 
     public int getMonthlyDuration(String username, int year, int month) {
-        TrainerWorkload workload = workloadStorage.get(username.toLowerCase());
-        if(workload == null) return 0;
-
-        Map<Integer, Integer> months = workload.getYears().get(year);
-        if(months == null) return 0;
-
-        return months.getOrDefault(month, 0);
-    } 
+        return repository.findById(username)
+                .map(workload -> workload.duration(year, month))
+                .orElse(0);
+    }
 }
